@@ -3,6 +3,7 @@ const BLUE = "#0066FF";
 const NAV_ITEMS = [
   { id: "dashboard", label: "Dashboard", icon: "📊" },
   { id: "clientes", label: "Clientes", icon: "👥" },
+  { id: "profissionais", label: "Profissionais", icon: "🛠️" },
 ];
 
 // Casca de navegação compartilhada por todas as telas autenticadas (Fase 2

@@ -5,29 +5,36 @@ import Layout from "./Layout";
 import Dashboard from "./Dashboard";
 import ClientList from "./ClientList";
 import ClientDetail from "./ClientDetail";
+import ProfessionalList from "./ProfessionalList";
+import ProfessionalDetail from "./ProfessionalDetail";
 
-// Máquina de telas simples (sem router — Fase 2 adiciona Dashboard como
-// home, mas ainda são poucas telas pra justificar uma lib de rota).
+// Máquina de telas simples (sem router). Fase 3 adiciona "profissionais"
+// ao lado de "clientes" — mesmo padrão de seleção (lista -> ficha) pras
+// duas seções.
 export default function App() {
   const [authed, setAuthed] = useState(() => !!getToken());
-  const [screen, setScreen] = useState("dashboard"); // "dashboard" | "clientes"
-  const [selectedEmail, setSelectedEmail] = useState(null);
+  const [screen, setScreen] = useState("dashboard"); // "dashboard" | "clientes" | "profissionais"
+  const [selectedClientEmail, setSelectedClientEmail] = useState(null);
+  const [selectedProfessionalEmail, setSelectedProfessionalEmail] = useState(null);
 
   const handleUnauthorized = useCallback(() => {
     clearToken();
     setAuthed(false);
-    setSelectedEmail(null);
+    setSelectedClientEmail(null);
+    setSelectedProfessionalEmail(null);
   }, []);
 
   const handleLogout = () => {
     clearToken();
     setAuthed(false);
-    setSelectedEmail(null);
+    setSelectedClientEmail(null);
+    setSelectedProfessionalEmail(null);
   };
 
   const handleNavigate = (next) => {
     setScreen(next);
-    setSelectedEmail(null); // sair da ficha ao trocar de seção pelo menu
+    setSelectedClientEmail(null); // sair da ficha ao trocar de seção pelo menu
+    setSelectedProfessionalEmail(null);
   };
 
   if (!authed) {
@@ -39,10 +46,21 @@ export default function App() {
       {screen === "dashboard" && <Dashboard onUnauthorized={handleUnauthorized} />}
 
       {screen === "clientes" &&
-        (selectedEmail ? (
-          <ClientDetail email={selectedEmail} onBack={() => setSelectedEmail(null)} onUnauthorized={handleUnauthorized} />
+        (selectedClientEmail ? (
+          <ClientDetail email={selectedClientEmail} onBack={() => setSelectedClientEmail(null)} onUnauthorized={handleUnauthorized} />
         ) : (
-          <ClientList onSelectClient={setSelectedEmail} onUnauthorized={handleUnauthorized} />
+          <ClientList onSelectClient={setSelectedClientEmail} onUnauthorized={handleUnauthorized} />
+        ))}
+
+      {screen === "profissionais" &&
+        (selectedProfessionalEmail ? (
+          <ProfessionalDetail
+            email={selectedProfessionalEmail}
+            onBack={() => setSelectedProfessionalEmail(null)}
+            onUnauthorized={handleUnauthorized}
+          />
+        ) : (
+          <ProfessionalList onSelectProfessional={setSelectedProfessionalEmail} onUnauthorized={handleUnauthorized} />
         ))}
     </Layout>
   );

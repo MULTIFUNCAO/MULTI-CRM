@@ -10,43 +10,82 @@ function formatDate(iso) {
   }
 }
 
+function FilterSelect({ value, onChange, options, placeholder }) {
+  return (
+    <select
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      style={{ padding: "10px 14px", borderRadius: 10, border: "1px solid #E5E7EB", fontSize: 14, background: "white" }}
+    >
+      <option value="">{placeholder}</option>
+      {options.map((opt) => (
+        <option key={opt} value={opt}>
+          {opt}
+        </option>
+      ))}
+    </select>
+  );
+}
+
 // Conteúdo da seção "Clientes" — o chrome (sidebar, "Sair") mora em
-// Layout.jsx desde a Fase 2, esse componente só cuida da própria tela.
+// Layout.jsx desde a Fase 2. Fase 3: filtros de cidade/categoria/status
+// são combináveis e batem direto no backend (GET /api/admin/clientes com
+// query params) — cada troca de dropdown refaz a busca; só a busca por
+// texto (nome/e-mail/cidade) continua no cliente, sobre o resultado que já
+// veio filtrado do servidor.
 export default function ClientList({ onSelectClient, onUnauthorized }) {
   const [clientes, setClientes] = useState(null);
   const [error, setError] = useState("");
   const [busca, setBusca] = useState("");
-  const [filtroStatus, setFiltroStatus] = useState("todos");
+  const [filtroStatus, setFiltroStatus] = useState("");
+  const [filtroCidade, setFiltroCidade] = useState("");
+  const [filtroCategoria, setFiltroCategoria] = useState("");
+  const [opcoes, setOpcoes] = useState({ cidades: [], categorias: [] });
 
   useEffect(() => {
-    adminFetch("/api/admin/clientes")
+    adminFetch("/api/admin/clientes-filtros")
+      .then(setOpcoes)
+      .catch(() => {}); // dropdown vazio não pode travar o resto da tela
+  }, []);
+
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (filtroCidade) params.set("cidade", filtroCidade);
+    if (filtroCategoria) params.set("categoria", filtroCategoria);
+    if (filtroStatus) params.set("status", filtroStatus);
+    const qs = params.toString();
+    adminFetch("/api/admin/clientes" + (qs ? "?" + qs : ""))
       .then(setClientes)
       .catch((err) => {
         if (err.unauthorized) return onUnauthorized();
         setError(err.message);
       });
-  }, [onUnauthorized]);
+  }, [filtroCidade, filtroCategoria, filtroStatus, onUnauthorized]);
 
   const filtrados = useMemo(() => {
     if (!clientes) return [];
     const termo = busca.trim().toLowerCase();
-    return clientes.filter((c) => {
-      if (filtroStatus !== "todos" && c.status_engajamento !== filtroStatus) return false;
-      if (!termo) return true;
-      return (
+    if (!termo) return clientes;
+    return clientes.filter(
+      (c) =>
         (c.name || "").toLowerCase().includes(termo) ||
         (c.email || "").toLowerCase().includes(termo) ||
         (c.city || "").toLowerCase().includes(termo)
-      );
-    });
-  }, [clientes, busca, filtroStatus]);
+    );
+  }, [clientes, busca]);
+
+  const algumFiltroAtivo = busca || filtroCidade || filtroCategoria || filtroStatus;
 
   return (
     <div style={{ padding: "24px 28px" }}>
       <div style={{ marginBottom: 18 }}>
         <h1 style={{ fontSize: 19, fontWeight: 900, margin: 0, color: "#111827" }}>Clientes</h1>
         <p style={{ fontSize: 13, color: "#6B7280", margin: "2px 0 0" }}>
-          {clientes ? `${clientes.length} cliente(s) cadastrado(s)` : "Carregando..."}
+          {!clientes
+            ? "Carregando..."
+            : algumFiltroAtivo
+            ? `${filtrados.length} de ${clientes.length} cliente(s)`
+            : `${clientes.length} cliente(s) cadastrado(s)`}
         </p>
       </div>
 
@@ -56,25 +95,21 @@ export default function ClientList({ onSelectClient, onUnauthorized }) {
           value={busca}
           onChange={(e) => setBusca(e.target.value)}
           style={{
-            flex: "1 1 260px",
+            flex: "1 1 240px",
             padding: "10px 14px",
             borderRadius: 10,
             border: "1px solid #E5E7EB",
             fontSize: 14,
           }}
         />
+        <FilterSelect value={filtroCidade} onChange={setFiltroCidade} options={opcoes.cidades} placeholder="Todas as cidades" />
+        <FilterSelect value={filtroCategoria} onChange={setFiltroCategoria} options={opcoes.categorias} placeholder="Todas as categorias" />
         <select
           value={filtroStatus}
           onChange={(e) => setFiltroStatus(e.target.value)}
-          style={{
-            padding: "10px 14px",
-            borderRadius: 10,
-            border: "1px solid #E5E7EB",
-            fontSize: 14,
-            background: "white",
-          }}
+          style={{ padding: "10px 14px", borderRadius: 10, border: "1px solid #E5E7EB", fontSize: 14, background: "white" }}
         >
-          <option value="todos">Todos os status</option>
+          <option value="">Todos os status</option>
           <option value="ativo">Ativo</option>
           <option value="sem_solicitacao">Nunca solicitou</option>
         </select>
