@@ -9,6 +9,7 @@ import ClientDetail from "./ClientDetail";
 import ProfessionalList from "./ProfessionalList";
 import ProfessionalDetail from "./ProfessionalDetail";
 import TeamManagement from "./TeamManagement";
+import MonetizationConfig from "./MonetizationConfig";
 
 // Máquina de telas simples (sem router). Fase 4 adiciona "operacoes"
 // (Central de Operações) e "equipe" (Gestão de Equipe, só administrador —
@@ -92,6 +93,8 @@ export default function App() {
         ))}
 
       {screen === "equipe" && <TeamManagement onUnauthorized={handleUnauthorized} />}
+
+      {screen === "monetizacao" && <MonetizationConfig onUnauthorized={handleUnauthorized} />}
     </Layout>
   );
 }

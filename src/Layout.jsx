@@ -27,7 +27,7 @@ const NAV_ITEMS = [
 // trava a tela se acontecer).
 export default function Layout({ active, onNavigate, onLogout, identity, children }) {
   const navItems = identity?.role === "administrador"
-    ? [...NAV_ITEMS, { id: "equipe", label: "Equipe", icon: "🔑" }]
+    ? [...NAV_ITEMS, { id: "equipe", label: "Equipe", icon: "🔑" }, { id: "monetizacao", label: "Monetização", icon: "💵" }]
     : NAV_ITEMS;
 
   return (

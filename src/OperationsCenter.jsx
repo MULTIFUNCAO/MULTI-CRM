@@ -11,17 +11,19 @@ function formatHoras(h) {
   return `${Math.round(h / 24)}d parado`;
 }
 
-// 6 tipos de alerta — os 5 primeiros já vêm prontos de /api/admin/oportunidades
+// 7 tipos de alerta — os 5 primeiros já vêm prontos de /api/admin/oportunidades
 // (rota que já existia desde a Fase 1 do CRM antigo, dado 100% real), o 6º é
-// o achado da Fase 3 (/api/admin/professionals?status=role_divergente).
-// Nenhum número aqui é calculado no frontend — só exibido como o backend
-// mandou.
+// o achado da Fase 3 (/api/admin/professionals?status=role_divergente), o 7º
+// é da correção do modelo financeiro (ciclo_financeiro.status ===
+// 'promocao_terminando' — últimos 7 dias antes do fim da promoção, calculado
+// no backend, não aqui). Nenhum número é calculado no frontend.
 const TIPOS = [
   { id: "sem_proposta", label: "Sem proposta", emoji: "🔴", cor: "#DC2626" },
   { id: "proposta_sem_resposta", label: "Proposta sem resposta", emoji: "🟠", cor: "#F59E0B" },
   { id: "parado_pos_aceite", label: "Parado pós-aceite", emoji: "🟣", cor: "#7C3AED" },
   { id: "clientes_reativaveis", label: "Clientes reativáveis", emoji: "🔄", cor: "#0EA5E9" },
   { id: "role_divergente", label: "Profissional preso (role)", emoji: "⚠️", cor: "#B45309" },
+  { id: "entrando_mensalidade", label: "Entrando na mensalidade", emoji: "🔔", cor: "#7C3AED" },
 ];
 
 // Central de Operações + Alertas — Fase 4. "O que entrou, o que está
@@ -31,6 +33,7 @@ const TIPOS = [
 export default function OperationsCenter({ onSelectClient, onSelectProfessional, onUnauthorized }) {
   const [oportunidades, setOportunidades] = useState(null);
   const [divergentes, setDivergentes] = useState(null);
+  const [profissionais, setProfissionais] = useState(null);
   const [error, setError] = useState("");
   const [tipoSelecionado, setTipoSelecionado] = useState(null);
 
@@ -43,23 +46,35 @@ export default function OperationsCenter({ onSelectClient, onSelectProfessional,
     adminFetch("/api/admin/professionals?status=role_divergente")
       .then((d) => setDivergentes(d.professionals || []))
       .catch(handleErr);
+    // Lista completa só pra achar quem tá terminando a promoção (ciclo
+    // financeiro vem embutido em cada profissional, calculado no backend).
+    adminFetch("/api/admin/professionals")
+      .then((d) => setProfissionais(d.professionals || []))
+      .catch(handleErr);
   }, [onUnauthorized]);
 
-  const carregando = !oportunidades || !divergentes;
+  const carregando = !oportunidades || !divergentes || !profissionais;
 
   const dinheiroNaMesa = oportunidades?.resumo?.dinheiro_na_mesa;
+
+  const entrandoNaMensalidade = useMemo(
+    () => (profissionais || []).filter((p) => p.ciclo_financeiro?.status === "promocao_terminando"),
+    [profissionais]
+  );
 
   const itensDoTipo = useMemo(() => {
     if (!tipoSelecionado || !oportunidades) return [];
     if (tipoSelecionado === "clientes_reativaveis") return oportunidades.reativaveis || [];
     if (tipoSelecionado === "role_divergente") return divergentes || [];
+    if (tipoSelecionado === "entrando_mensalidade") return entrandoNaMensalidade;
     return (oportunidades.itens || []).filter((i) => i.tipo === tipoSelecionado);
-  }, [tipoSelecionado, oportunidades, divergentes]);
+  }, [tipoSelecionado, oportunidades, divergentes, entrandoNaMensalidade]);
 
   const contagem = (tipoId) => {
-    if (!oportunidades || !divergentes) return null;
+    if (!oportunidades || !divergentes || !profissionais) return null;
     if (tipoId === "clientes_reativaveis") return oportunidades.resumo.clientes_reativaveis.count;
     if (tipoId === "role_divergente") return divergentes.length;
+    if (tipoId === "entrando_mensalidade") return entrandoNaMensalidade.length;
     return oportunidades.resumo[tipoId]?.count ?? 0;
   };
 
@@ -135,7 +150,7 @@ export default function OperationsCenter({ onSelectClient, onSelectProfessional,
                 <div
                   key={item.pedido_id || item.email || i}
                   onClick={() => {
-                    if (tipoSelecionado === "role_divergente") onSelectProfessional(item.email);
+                    if (tipoSelecionado === "role_divergente" || tipoSelecionado === "entrando_mensalidade") onSelectProfessional(item.email);
                     else if (item.cliente_email) onSelectClient(item.cliente_email);
                   }}
                   style={{
@@ -149,7 +164,17 @@ export default function OperationsCenter({ onSelectClient, onSelectProfessional,
                     cursor: "pointer",
                   }}
                 >
-                  {tipoSelecionado === "role_divergente" ? (
+                  {tipoSelecionado === "entrando_mensalidade" ? (
+                    <>
+                      <div>
+                        <div style={{ fontWeight: 700, color: "#111827", fontSize: 13 }}>{item.name || "(sem nome)"}</div>
+                        <div style={{ color: "#9CA3AF", fontSize: 12 }}>{item.email}</div>
+                      </div>
+                      <div style={{ display: "flex", gap: 14, alignItems: "center", fontSize: 12 }}>
+                        <span style={{ color: "#6B7280" }}>vira R$ {item.ciclo_financeiro.valor_proxima_cobranca} em {new Date(item.ciclo_financeiro.fim_promocao).toLocaleDateString("pt-BR")}</span>
+                      </div>
+                    </>
+                  ) : tipoSelecionado === "role_divergente" ? (
                     <>
                       <div>
                         <div style={{ fontWeight: 700, color: "#111827", fontSize: 13 }}>{item.name || "(sem nome)"}</div>

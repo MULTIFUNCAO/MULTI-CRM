@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { adminFetch } from "./api";
+import { CICLO_LABEL } from "./ProfessionalList";
 
 function formatDateTime(iso) {
   if (!iso) return "—";
@@ -97,6 +98,40 @@ export default function ProfessionalDetail({ email, onBack, onUnauthorized }) {
                 </div>
               </div>
             </div>
+
+            {/* Ciclo financeiro — correção do modelo financeiro, só existe pra
+                quem tem plano "acesso" de verdade */}
+            {data.ciclo_financeiro && (() => {
+              const info = CICLO_LABEL[data.ciclo_financeiro.status] || { emoji: "⚪", label: data.ciclo_financeiro.status };
+              return (
+                <div style={{ background: "white", borderRadius: 16, border: "1px solid #E5E7EB", padding: 20, marginBottom: 16 }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14, flexWrap: "wrap", gap: 8 }}>
+                    <h3 style={{ fontSize: 14, fontWeight: 800, margin: 0, color: "#111827" }}>Ciclo financeiro — Taxa de Acesso</h3>
+                    <span style={{ fontSize: 12, fontWeight: 800 }}>{info.emoji} {info.label}</span>
+                  </div>
+                  <div style={{ display: "flex", gap: 20, flexWrap: "wrap", fontSize: 13 }}>
+                    <div>
+                      <div style={{ color: "#9CA3AF", fontSize: 11, fontWeight: 700, textTransform: "uppercase" }}>Plano atual</div>
+                      <div style={{ color: "#111827", fontWeight: 600, textTransform: "capitalize" }}>{data.ciclo_financeiro.plano_atual}</div>
+                    </div>
+                    <div>
+                      <div style={{ color: "#9CA3AF", fontSize: 11, fontWeight: 700, textTransform: "uppercase" }}>Data de entrada</div>
+                      <div style={{ color: "#111827", fontWeight: 600 }}>{formatDateTime(data.ciclo_financeiro.data_entrada)}</div>
+                    </div>
+                    <div>
+                      <div style={{ color: "#9CA3AF", fontSize: 11, fontWeight: 700, textTransform: "uppercase" }}>Fim da promoção</div>
+                      <div style={{ color: "#111827", fontWeight: 600 }}>{formatDateTime(data.ciclo_financeiro.fim_promocao)}</div>
+                    </div>
+                    <div>
+                      <div style={{ color: "#9CA3AF", fontSize: 11, fontWeight: 700, textTransform: "uppercase" }}>Próxima cobrança</div>
+                      <div style={{ color: "#111827", fontWeight: 600 }}>
+                        {formatDateTime(data.ciclo_financeiro.proxima_cobranca)} — {formatMoney(data.ciclo_financeiro.valor_proxima_cobranca)}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
 
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12, marginBottom: 16 }}>
               {[

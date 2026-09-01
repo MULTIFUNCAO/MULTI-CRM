@@ -32,6 +32,26 @@ const STATUS_LABEL = {
   pendente: { label: "Pendente", bg: "#FFFBEB", fg: "#B45309" },
 };
 
+// Correção do modelo financeiro (2026-09-01) — status do ciclo da Taxa de
+// Acesso, só existe pra quem tem plano='acesso'. Mesmos 4 estados usados na
+// Ficha do Profissional e no 7º alerta da Central de Operações.
+export const CICLO_LABEL = {
+  promocao_ativa: { emoji: "🟢", label: "Promoção ativa", bg: "#ECFDF5", fg: "#059669" },
+  promocao_terminando: { emoji: "🟡", label: "Promoção terminando", bg: "#FFFBEB", fg: "#B45309" },
+  mensalidade_ativa: { emoji: "🟢", label: "Mensalidade ativa", bg: "#ECFDF5", fg: "#059669" },
+  em_atraso: { emoji: "🔴", label: "Em atraso", bg: "#FEF2F2", fg: "#DC2626" },
+};
+
+function CicloBadge({ ciclo }) {
+  if (!ciclo) return <span style={{ color: "#9CA3AF", fontSize: 12 }}>—</span>;
+  const info = CICLO_LABEL[ciclo.status] || { emoji: "⚪", label: ciclo.status, bg: "#F3F4F6", fg: "#6B7280" };
+  return (
+    <span style={{ fontSize: 11, fontWeight: 800, padding: "4px 10px", borderRadius: 999, background: info.bg, color: info.fg, whiteSpace: "nowrap" }}>
+      {info.emoji} {info.label}
+    </span>
+  );
+}
+
 // Fase 3 — mesmo padrão visual/estrutural de ClientList.jsx. Filtros de
 // cidade/categoria/status batem no backend (GET /api/admin/professionals
 // com query params); busca por texto continua no cliente.
@@ -128,7 +148,7 @@ export default function ProfessionalList({ onSelectProfessional, onUnauthorized 
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
               <thead>
                 <tr style={{ background: "#F9FAFB", textAlign: "left" }}>
-                  {["Nome", "Contato", "Categoria(s)", "Cidade", "Cadastro", "Pedidos aceitos", "Status"].map((h) => (
+                  {["Nome", "Contato", "Categoria(s)", "Cidade", "Cadastro", "Pedidos aceitos", "Status", "Ciclo (Acesso)"].map((h) => (
                     <th key={h} style={{ padding: "10px 14px", fontWeight: 700, color: "#6B7280", whiteSpace: "nowrap" }}>
                       {h}
                     </th>
@@ -171,12 +191,15 @@ export default function ProfessionalList({ onSelectProfessional, onUnauthorized 
                           {status.label}
                         </span>
                       </td>
+                      <td style={{ padding: "12px 14px" }}>
+                        <CicloBadge ciclo={p.ciclo_financeiro} />
+                      </td>
                     </tr>
                   );
                 })}
                 {filtrados.length === 0 && (
                   <tr>
-                    <td colSpan={7} style={{ padding: 24, textAlign: "center", color: "#9CA3AF" }}>
+                    <td colSpan={8} style={{ padding: 24, textAlign: "center", color: "#9CA3AF" }}>
                       Nenhum profissional encontrado.
                     </td>
                   </tr>
