@@ -3,18 +3,21 @@ import { login } from "./api";
 
 const BLUE = "#0066FF";
 
+// Fase 4: login por pessoa (email + senha), não mais só uma senha de admin
+// compartilhada — ver crm_equipe/api.js.
 export default function LoginScreen({ onSuccess }) {
-  const [password, setPassword] = useState("");
+  const [email, setEmail] = useState("");
+  const [senha, setSenha] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!password) return;
+    if (!email || !senha) return;
     setLoading(true);
     setError("");
     try {
-      await login(password);
+      await login(email, senha);
       onSuccess();
     } catch (err) {
       setError(err.message || "Não foi possível entrar.");
@@ -69,14 +72,29 @@ export default function LoginScreen({ onSuccess }) {
           </p>
         </div>
 
-        <label style={{ fontSize: 13, fontWeight: 700, color: "#374151" }}>
-          Senha de admin
-        </label>
+        <label style={{ fontSize: 13, fontWeight: 700, color: "#374151" }}>E-mail</label>
+        <input
+          type="email"
+          autoFocus
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          style={{
+            width: "100%",
+            marginTop: 6,
+            marginBottom: 14,
+            padding: "12px 14px",
+            borderRadius: 12,
+            border: "1px solid #E5E7EB",
+            fontSize: 14,
+            boxSizing: "border-box",
+          }}
+        />
+
+        <label style={{ fontSize: 13, fontWeight: 700, color: "#374151" }}>Senha</label>
         <input
           type="password"
-          autoFocus
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
+          value={senha}
+          onChange={(e) => setSenha(e.target.value)}
           style={{
             width: "100%",
             marginTop: 6,
@@ -106,17 +124,17 @@ export default function LoginScreen({ onSuccess }) {
 
         <button
           type="submit"
-          disabled={loading || !password}
+          disabled={loading || !email || !senha}
           style={{
             width: "100%",
             padding: "13px 0",
             borderRadius: 12,
             border: "none",
-            background: loading || !password ? "#9CA3AF" : `linear-gradient(135deg,${BLUE},#0055d4)`,
+            background: loading || !email || !senha ? "#9CA3AF" : `linear-gradient(135deg,${BLUE},#0055d4)`,
             color: "white",
             fontWeight: 800,
             fontSize: 14,
-            cursor: loading || !password ? "default" : "pointer",
+            cursor: loading || !email || !senha ? "default" : "pointer",
           }}
         >
           {loading ? "Entrando..." : "Entrar"}

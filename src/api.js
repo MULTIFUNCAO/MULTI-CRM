@@ -1,28 +1,47 @@
 // Cliente HTTP pro MULTI-BACKEND (mesmo backend do app cliente/profissional
 // — ver auditoria Fase 1). O Admin/CRM não conecta direto no Supabase: usa
-// as mesmas rotas /api/admin/* que o AdminDashboard.jsx antigo já usa,
-// autenticadas pelo mesmo esquema de token HMAC (POST /api/admin/login).
+// as rotas /api/admin/* do MULTI-BACKEND, autenticadas por token HMAC.
+//
+// Fase 4: login passou a ser por pessoa (POST /api/admin/equipe/login,
+// tabela crm_equipe — Thiago administrador, Ana vendedora), não mais a
+// senha única do Admin antigo. O backend ainda aceita os dois tipos de
+// token nas mesmas rotas (retrocompatível com o Admin antigo em
+// AdminDashboard.jsx, que não foi tocado), mas este frontend (MULTI-CRM)
+// só usa o login novo daqui pra frente.
 
 export const API_BASE =
   import.meta.env.VITE_API_URL || "https://multi-backend-lfwp.onrender.com";
 
 const TOKEN_KEY = "multi_crm_admin_token";
+const IDENTITY_KEY = "multi_crm_identity"; // { nome, role }
 
 export function getToken() {
   return localStorage.getItem(TOKEN_KEY);
 }
 
-export function setToken(token) {
+export function getIdentity() {
+  try {
+    return JSON.parse(localStorage.getItem(IDENTITY_KEY)) || null;
+  } catch {
+    return null;
+  }
+}
+
+function setSession(token, identity) {
   localStorage.setItem(TOKEN_KEY, token);
+  localStorage.setItem(IDENTITY_KEY, JSON.stringify(identity));
 }
 
 export function clearToken() {
   localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(IDENTITY_KEY);
 }
 
 // Faz um GET/POST/etc autenticado em /api/admin/*. Em 401 (token ausente,
-// expirado ou inválido) limpa o token guardado — quem chama decide navegar
-// de volta pro login (ver App.jsx).
+// expirado ou inválido) limpa a sessão guardada — quem chama decide navegar
+// de volta pro login (ver App.jsx). 403 (sem permissão pro role) não limpa
+// sessão, só propaga o erro — a pessoa continua logada, só não pode fazer
+// aquela ação específica.
 export async function adminFetch(path, options = {}) {
   const token = getToken();
   const res = await fetch(API_BASE + path, {
@@ -47,14 +66,14 @@ export async function adminFetch(path, options = {}) {
   return body;
 }
 
-export async function login(password) {
-  const res = await fetch(API_BASE + "/api/admin/login", {
+export async function login(email, senha) {
+  const res = await fetch(API_BASE + "/api/admin/equipe/login", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ password }),
+    body: JSON.stringify({ email, senha }),
   });
   const body = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(body?.error || "Falha no login");
-  setToken(body.token);
-  return body.token;
+  setSession(body.token, { nome: body.nome, role: body.role });
+  return body;
 }
