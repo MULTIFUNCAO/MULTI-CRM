@@ -33,10 +33,10 @@ function FilterSelect({ value, onChange, options, placeholder }) {
 // query params) — cada troca de dropdown refaz a busca; só a busca por
 // texto (nome/e-mail/cidade) continua no cliente, sobre o resultado que já
 // veio filtrado do servidor.
-export default function ClientList({ onSelectClient, onUnauthorized }) {
+export default function ClientList({ onSelectClient, onUnauthorized, initialBusca }) {
   const [clientes, setClientes] = useState(null);
   const [error, setError] = useState("");
-  const [busca, setBusca] = useState("");
+  const [busca, setBusca] = useState(initialBusca || "");
   const [filtroStatus, setFiltroStatus] = useState("");
   const [filtroCidade, setFiltroCidade] = useState("");
   const [filtroCategoria, setFiltroCategoria] = useState("");

@@ -2,26 +2,40 @@ import { useCallback, useState } from "react";
 import { getToken, getIdentity, clearToken } from "./api";
 import LoginScreen from "./LoginScreen";
 import Layout from "./Layout";
-import Dashboard from "./Dashboard";
-import OperationsCenter from "./OperationsCenter";
+import Overview from "./Overview";
 import ClientList from "./ClientList";
 import ClientDetail from "./ClientDetail";
 import ProfessionalList from "./ProfessionalList";
 import ProfessionalDetail from "./ProfessionalDetail";
 import TeamManagement from "./TeamManagement";
 import MonetizationConfig from "./MonetizationConfig";
+import AdminHome from "./AdminHome";
+import ComingSoon from "./ComingSoon";
 
-// Máquina de telas simples (sem router). Fase 4 adiciona "operacoes"
-// (Central de Operações) e "equipe" (Gestão de Equipe, só administrador —
-// Layout já esconde o item de nav pro resto, mas a tela também navega pra
-// lá se alguém tentar via estado direto, então o backend que barra de
-// verdade com 403).
+// Textos honestos pro que ainda não existe — nunca dado fictício, só a
+// explicação do que falta (regra 35 do documento "COMANDO MASTER").
+const EM_CONSTRUCAO = {
+  inbox: { title: "Inbox", subtitle: "Central de comunicação", motivo: "Não existe integração de mensageria hoje (WhatsApp Business API/provedor) — só links wa.me no app do cliente, sem histórico nem envio pelo CRM. Precisa de um provedor contratado e decisão sua antes de existir de verdade." },
+  vendas: { title: "Vendas", subtitle: "Pipeline comercial", motivo: "Não existe uma tabela de leads/oportunidades comerciais persistida, nem campo de responsável (vendedor) em nenhuma tabela ainda. Infra nova, prioridade a decidir depois da Etapa 1-5." },
+  demandas: { title: "Demandas", subtitle: "Pipeline operacional", motivo: "Os pedidos já existem e têm dado real (ver Visão Geral e as fichas de Cliente/Profissional), mas ainda não como uma tela de pipeline dedicada com o funil descrito no plano." },
+  financeiro: { title: "Financeiro", subtitle: "Receitas, cobranças, inadimplência", motivo: "Monetização (Taxa de Acesso) já existe em Administrativo. Um dashboard financeiro completo (receita/mês/ano, recorrência, inadimplência agregada) ainda não foi construído." },
+  marketing: { title: "Marketing", subtitle: "Campanhas e aquisição", motivo: "Não existe rastreamento de origem/campanha (UTM) nem integração com plataformas de anúncio hoje — pedidos.origem só distingue real/demo/suporte, não é dado de marketing." },
+  metas: { title: "Metas & Performance", subtitle: "Metas por empresa, equipe e vendedor", motivo: "Não existe nenhuma configuração de meta no banco ainda." },
+  inteligencia: { title: "Inteligência MULTI", subtitle: "Central de sinais entre módulos", motivo: "Depende dos módulos que ainda não existem (Vendas, Marketing) pra cruzar dado de verdade — construída conforme eles forem nascendo." },
+  relatorios: { title: "Relatórios", subtitle: "Vendas, funil, financeiro, marketing...", motivo: "Ainda não construído." },
+};
+
+// Máquina de telas — MULTI Command Center, Etapa 1-5 (ver memória do
+// projeto). Sem router: telas simples trocando por estado, mesmo padrão de
+// sempre neste projeto.
 export default function App() {
   const [authed, setAuthed] = useState(() => !!getToken());
   const [identity, setIdentity] = useState(() => getIdentity());
-  const [screen, setScreen] = useState("dashboard"); // dashboard | operacoes | clientes | profissionais | equipe
+  const [screen, setScreen] = useState("visao-geral");
   const [selectedClientEmail, setSelectedClientEmail] = useState(null);
   const [selectedProfessionalEmail, setSelectedProfessionalEmail] = useState(null);
+  const [globalSearchTerm, setGlobalSearchTerm] = useState("");
+  const [searchKey, setSearchKey] = useState(0);
 
   const handleUnauthorized = useCallback(() => {
     clearToken();
@@ -46,13 +60,10 @@ export default function App() {
 
   const handleNavigate = (next) => {
     setScreen(next);
-    setSelectedClientEmail(null); // sair da ficha ao trocar de seção pelo menu
+    setSelectedClientEmail(null);
     setSelectedProfessionalEmail(null);
   };
 
-  // Central de Operações manda direto pra ficha de cliente/profissional,
-  // trocando de seção — não é filho de "clientes"/"profissionais" na
-  // navegação, então precisa setar os dois (seção + seleção) junto.
   const irParaCliente = (email) => {
     setScreen("clientes");
     setSelectedClientEmail(email);
@@ -62,23 +73,40 @@ export default function App() {
     setSelectedProfessionalEmail(email);
   };
 
+  // Busca global (header) — Clientes/Profissionais é o que tem dado real
+  // pesquisável hoje; Leads/Demandas/Conversas entram quando essas telas
+  // existirem. Vai direto pra Clientes com o termo já preenchido.
+  const handleGlobalSearch = (termo) => {
+    setGlobalSearchTerm(termo);
+    setSearchKey((k) => k + 1);
+    setScreen("clientes");
+    setSelectedClientEmail(null);
+  };
+
   if (!authed) {
     return <LoginScreen onSuccess={handleLoginSuccess} />;
   }
 
-  return (
-    <Layout active={screen} onNavigate={handleNavigate} onLogout={handleLogout} identity={identity}>
-      {screen === "dashboard" && <Dashboard onUnauthorized={handleUnauthorized} />}
+  const comingSoon = EM_CONSTRUCAO[screen];
 
-      {screen === "operacoes" && (
-        <OperationsCenter onSelectClient={irParaCliente} onSelectProfessional={irParaProfissional} onUnauthorized={handleUnauthorized} />
-      )}
+  return (
+    <Layout
+      active={screen}
+      onNavigate={handleNavigate}
+      onLogout={handleLogout}
+      identity={identity}
+      onSelectClient={irParaCliente}
+      onSelectProfessional={irParaProfissional}
+      onGlobalSearch={handleGlobalSearch}
+      onUnauthorized={handleUnauthorized}
+    >
+      {screen === "visao-geral" && <Overview onSelectClient={irParaCliente} onSelectProfessional={irParaProfissional} onUnauthorized={handleUnauthorized} />}
 
       {screen === "clientes" &&
         (selectedClientEmail ? (
           <ClientDetail email={selectedClientEmail} onBack={() => setSelectedClientEmail(null)} onUnauthorized={handleUnauthorized} />
         ) : (
-          <ClientList onSelectClient={setSelectedClientEmail} onUnauthorized={handleUnauthorized} />
+          <ClientList key={searchKey} onSelectClient={setSelectedClientEmail} onUnauthorized={handleUnauthorized} initialBusca={globalSearchTerm} />
         ))}
 
       {screen === "profissionais" &&
@@ -92,9 +120,11 @@ export default function App() {
           <ProfessionalList onSelectProfessional={setSelectedProfessionalEmail} onUnauthorized={handleUnauthorized} />
         ))}
 
+      {screen === "administrativo" && <AdminHome onNavigate={setScreen} />}
       {screen === "equipe" && <TeamManagement onUnauthorized={handleUnauthorized} />}
-
       {screen === "monetizacao" && <MonetizationConfig onUnauthorized={handleUnauthorized} />}
+
+      {comingSoon && <ComingSoon title={comingSoon.title} subtitle={comingSoon.subtitle} motivo={comingSoon.motivo} />}
     </Layout>
   );
 }
