@@ -41,20 +41,8 @@ export default function ClientDetail({ email, onBack, onUnauthorized }) {
   }, [email, onUnauthorized]);
 
   return (
-    <div style={{ minHeight: "100vh", background: "#F8F9FA" }}>
-      <header
-        style={{
-          background: "white",
-          borderBottom: "1px solid #E5E7EB",
-          padding: "16px 24px",
-          display: "flex",
-          alignItems: "center",
-          gap: 14,
-          position: "sticky",
-          top: 0,
-          zIndex: 10,
-        }}
-      >
+    <div style={{ padding: "24px 28px" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 18 }}>
         <button
           onClick={onBack}
           style={{
@@ -70,12 +58,12 @@ export default function ClientDetail({ email, onBack, onUnauthorized }) {
         >
           ← Voltar
         </button>
-        <h1 style={{ fontSize: 16, fontWeight: 900, margin: 0, color: "#111827" }}>
+        <h1 style={{ fontSize: 19, fontWeight: 900, margin: 0, color: "#111827" }}>
           Ficha do cliente
         </h1>
-      </header>
+      </div>
 
-      <div style={{ maxWidth: 900, margin: "0 auto", padding: "20px 24px" }}>
+      <div style={{ maxWidth: 900 }}>
         {error && (
           <div style={{ background: "#FEF2F2", color: "#DC2626", padding: 14, borderRadius: 12, marginBottom: 16 }}>
             {error}
