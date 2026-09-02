@@ -24,7 +24,7 @@ export const NAV_ITEMS = [
   { id: "financeiro", label: "Financeiro", icon: "💰", pronto: false },
   { id: "marketing", label: "Marketing", icon: "📢", pronto: true },
   { id: "metas", label: "Metas & Performance", icon: "🎯", pronto: true },
-  { id: "inteligencia", label: "Inteligência MULTI", icon: "🧠", pronto: false },
+  { id: "inteligencia", label: "Inteligência MULTI", icon: "🧠", pronto: true },
   { id: "relatorios", label: "Relatórios", icon: "📊", pronto: true },
 ];
 

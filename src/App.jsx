@@ -17,6 +17,7 @@ import Demandas from "./Demandas";
 import Relatorios from "./Relatorios";
 import Marketing from "./Marketing";
 import Metas from "./Metas";
+import Inteligencia from "./Inteligencia";
 
 // Textos honestos pro que ainda não existe — nunca dado fictício, só a
 // explicação do que falta (regra 35 do documento "COMANDO MASTER").
@@ -37,7 +38,9 @@ const EM_CONSTRUCAO = {
   // agora numa seção da tela, não bloqueando ela inteira.
   // "metas" saiu daqui em 2026-09-02 (handoff item 5) — tabela
   // metas_mensais + Metas.jsx já são reais.
-  inteligencia: { title: "Inteligência MULTI", subtitle: "Central de sinais entre módulos", motivo: "Depende dos módulos que ainda não existem (Vendas, Marketing) pra cruzar dado de verdade — construída conforme eles forem nascendo." },
+  // "inteligencia" saiu daqui em 2026-09-02 (handoff item 5) — Vendas e
+  // Marketing (o que faltava pra existir) já existem, Inteligencia.jsx já
+  // é real.
   // "relatorios" saiu daqui em 2026-09-02 (handoff item 5, parcial) —
   // Exportação CSV + Funil de conversão do profissional já são reais
   // (Relatorios.jsx). Conciliação Asaas×extrato bancário continua honesta
@@ -133,6 +136,8 @@ export default function App() {
       {screen === "marketing" && <Marketing />}
 
       {screen === "metas" && <Metas />}
+
+      {screen === "inteligencia" && <Inteligencia onUnauthorized={handleUnauthorized} />}
 
       {screen === "clientes" &&
         (selectedClientEmail ? (
