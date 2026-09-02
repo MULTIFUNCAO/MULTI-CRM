@@ -22,7 +22,7 @@ function NaoFecharam() {
 
   useEffect(() => {
     adminFetch("/api/admin/clientes?status=sem_solicitacao")
-      .then(d => setClientes(d.clientes || []))
+      .then(setClientes)
       .catch(e => setError(e.message));
   }, []);
 
