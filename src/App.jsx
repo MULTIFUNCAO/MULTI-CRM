@@ -15,6 +15,7 @@ import Inbox from "./Inbox";
 import Vendas from "./Vendas";
 import Demandas from "./Demandas";
 import Relatorios from "./Relatorios";
+import Marketing from "./Marketing";
 
 // Textos honestos pro que ainda não existe — nunca dado fictício, só a
 // explicação do que falta (regra 35 do documento "COMANDO MASTER").
@@ -29,7 +30,10 @@ const EM_CONSTRUCAO = {
   // NÃO é o pipeline de pedidos que o motivo antigo descrevia, é lista
   // pessoal de tarefas (Demandas.jsx + tabela demandas_pessoais).
   financeiro: { title: "Financeiro", subtitle: "Receitas, cobranças, inadimplência", motivo: "Monetização (Taxa de Acesso) já existe em Administrativo. Um dashboard financeiro completo (receita/mês/ano, recorrência, inadimplência agregada) ainda não foi construído." },
-  marketing: { title: "Marketing", subtitle: "Campanhas e aquisição", motivo: "Não existe rastreamento de origem/campanha (UTM) nem integração com plataformas de anúncio hoje — pedidos.origem só distingue real/demo/suporte, não é dado de marketing." },
+  // "marketing" saiu daqui em 2026-09-02 (handoff item 5, parcial) — só o
+  // painel "Não Fecharam"+reengajamento por push é real (Marketing.jsx);
+  // campanhas/UTM e templates continuam honestos sobre o que falta, mas
+  // agora numa seção da tela, não bloqueando ela inteira.
   metas: { title: "Metas & Performance", subtitle: "Metas por empresa, equipe e vendedor", motivo: "Não existe nenhuma configuração de meta no banco ainda." },
   inteligencia: { title: "Inteligência MULTI", subtitle: "Central de sinais entre módulos", motivo: "Depende dos módulos que ainda não existem (Vendas, Marketing) pra cruzar dado de verdade — construída conforme eles forem nascendo." },
   // "relatorios" saiu daqui em 2026-09-02 (handoff item 5, parcial) —
@@ -123,6 +127,8 @@ export default function App() {
       {screen === "demandas" && <Demandas onUnauthorized={handleUnauthorized} />}
 
       {screen === "relatorios" && <Relatorios />}
+
+      {screen === "marketing" && <Marketing />}
 
       {screen === "clientes" &&
         (selectedClientEmail ? (

@@ -22,7 +22,7 @@ export const NAV_ITEMS = [
   { id: "profissionais", label: "Profissionais", icon: "👷", pronto: true },
   { id: "clientes", label: "Clientes", icon: "👥", pronto: true },
   { id: "financeiro", label: "Financeiro", icon: "💰", pronto: false },
-  { id: "marketing", label: "Marketing", icon: "📢", pronto: false },
+  { id: "marketing", label: "Marketing", icon: "📢", pronto: true },
   { id: "metas", label: "Metas & Performance", icon: "🎯", pronto: false },
   { id: "inteligencia", label: "Inteligência MULTI", icon: "🧠", pronto: false },
   { id: "relatorios", label: "Relatórios", icon: "📊", pronto: true },
