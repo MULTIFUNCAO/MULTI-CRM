@@ -77,11 +77,20 @@ export default function Overview({ onSelectClient, onSelectProfessional, onUnaut
             <StatTile label="Fechados" value={stats.pedidosFechados} icon="🤝" />
           </div>
 
-          {/* Bloco 2 — Dinheiro na Mesa */}
+          {/* Bloco 2 — Dinheiro na Mesa. Texto/valor trocam sozinhos conforme
+              o modelo de cobrança ativo (comissao_ativa em config_monetizacao)
+              — ver useAlerts.js e /api/admin/oportunidades. Correção do
+              modelo financeiro, MULTI-CRM, 2026-09-01: enquanto comissão
+              estiver desligada (hoje), isso é mensalidade de profissional
+              pendente, não valor de serviço. */}
           <Card style={{ background: `linear-gradient(135deg,${COLORS.green},#047857)`, color: "white", marginBottom: 16 }}>
             <div style={{ fontSize: 12, fontWeight: 700, opacity: 0.85, textTransform: "uppercase" }}>💰 Dinheiro na mesa</div>
             <div style={{ fontSize: 30, fontWeight: 900, marginTop: 4 }}>{formatMoney(alertas.dinheiroNaMesa)}</div>
-            <div style={{ fontSize: 12, opacity: 0.85, marginTop: 2 }}>Soma de pedidos sem proposta + proposta sem resposta + parado pós-aceite</div>
+            <div style={{ fontSize: 12, opacity: 0.85, marginTop: 2 }}>
+              {alertas.dinheiroNaMesaModo === "servico"
+                ? "Soma de pedidos sem proposta + proposta sem resposta + parado pós-aceite"
+                : `Mensalidade pendente de ${alertas.dinheiroNaMesaQtd ?? 0} profissional(is) sem pagamento confirmado`}
+            </div>
           </Card>
 
           {/* Bloco 3 — Precisa de Atenção */}

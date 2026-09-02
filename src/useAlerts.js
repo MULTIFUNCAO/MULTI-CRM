@@ -58,6 +58,12 @@ export function useAlerts(onUnauthorized) {
 
   const total = carregando ? null : TIPOS.reduce((s, t) => s + (contagem(t.id) || 0), 0);
   const dinheiroNaMesa = oportunidades?.resumo?.dinheiro_na_mesa;
+  // "modo" decide o texto do card (Correção do modelo financeiro, MULTI-CRM,
+  // 2026-09-01) — "servico" só volta a fazer sentido quando o modelo de
+  // comissão for ligado (config_monetizacao.comissao_ativa); até lá o
+  // backend já manda "mensalidade" e o valor calculado certo pra isso.
+  const dinheiroNaMesaModo = oportunidades?.resumo?.dinheiro_na_mesa_modo || "mensalidade";
+  const dinheiroNaMesaQtd = oportunidades?.resumo?.dinheiro_na_mesa_mensalidade_qtd;
 
-  return { carregando, error, tipos: TIPOS, contagem, itensDoTipo, total, dinheiroNaMesa };
+  return { carregando, error, tipos: TIPOS, contagem, itensDoTipo, total, dinheiroNaMesa, dinheiroNaMesaModo, dinheiroNaMesaQtd };
 }
