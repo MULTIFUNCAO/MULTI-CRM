@@ -66,6 +66,35 @@ export async function adminFetch(path, options = {}) {
   return body;
 }
 
+// Download autenticado (CSV etc.) — não dá pra só usar <a href> porque o
+// endpoint exige o header x-admin-key, que um link comum não manda. Busca
+// como blob e simula o clique num <a> temporário com URL.createObjectURL.
+export async function adminDownload(path, nomeArquivo) {
+  const token = getToken();
+  const res = await fetch(API_BASE + path, {
+    headers: token ? { "x-admin-key": token } : {},
+  });
+  if (res.status === 401) {
+    clearToken();
+    const err = new Error("Sessão expirada. Faça login novamente.");
+    err.unauthorized = true;
+    throw err;
+  }
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body?.error || `Erro ${res.status} ao baixar ${path}`);
+  }
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = nomeArquivo;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
 export async function login(email, senha) {
   const res = await fetch(API_BASE + "/api/admin/equipe/login", {
     method: "POST",

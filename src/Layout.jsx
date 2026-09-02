@@ -25,7 +25,7 @@ export const NAV_ITEMS = [
   { id: "marketing", label: "Marketing", icon: "📢", pronto: false },
   { id: "metas", label: "Metas & Performance", icon: "🎯", pronto: false },
   { id: "inteligencia", label: "Inteligência MULTI", icon: "🧠", pronto: false },
-  { id: "relatorios", label: "Relatórios", icon: "📊", pronto: false },
+  { id: "relatorios", label: "Relatórios", icon: "📊", pronto: true },
 ];
 
 function NavButton({ item, active, onClick }) {

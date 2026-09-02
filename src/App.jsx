@@ -14,6 +14,7 @@ import ComingSoon from "./ComingSoon";
 import Inbox from "./Inbox";
 import Vendas from "./Vendas";
 import Demandas from "./Demandas";
+import Relatorios from "./Relatorios";
 
 // Textos honestos pro que ainda não existe — nunca dado fictício, só a
 // explicação do que falta (regra 35 do documento "COMANDO MASTER").
@@ -31,7 +32,11 @@ const EM_CONSTRUCAO = {
   marketing: { title: "Marketing", subtitle: "Campanhas e aquisição", motivo: "Não existe rastreamento de origem/campanha (UTM) nem integração com plataformas de anúncio hoje — pedidos.origem só distingue real/demo/suporte, não é dado de marketing." },
   metas: { title: "Metas & Performance", subtitle: "Metas por empresa, equipe e vendedor", motivo: "Não existe nenhuma configuração de meta no banco ainda." },
   inteligencia: { title: "Inteligência MULTI", subtitle: "Central de sinais entre módulos", motivo: "Depende dos módulos que ainda não existem (Vendas, Marketing) pra cruzar dado de verdade — construída conforme eles forem nascendo." },
-  relatorios: { title: "Relatórios", subtitle: "Vendas, funil, financeiro, marketing...", motivo: "Ainda não construído." },
+  // "relatorios" saiu daqui em 2026-09-02 (handoff item 5, parcial) —
+  // Exportação CSV + Funil de conversão do profissional já são reais
+  // (Relatorios.jsx). Conciliação Asaas×extrato bancário continua honesta
+  // sobre o que falta, mas agora só numa seção da tela, não bloqueando ela
+  // inteira (mesmo padrão já usado no Inbox pra WhatsApp).
 };
 
 // Máquina de telas — MULTI Command Center, Etapa 1-5 (ver memória do
@@ -116,6 +121,8 @@ export default function App() {
       {screen === "vendas" && <Vendas onUnauthorized={handleUnauthorized} />}
 
       {screen === "demandas" && <Demandas onUnauthorized={handleUnauthorized} />}
+
+      {screen === "relatorios" && <Relatorios />}
 
       {screen === "clientes" &&
         (selectedClientEmail ? (
