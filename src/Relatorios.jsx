@@ -62,9 +62,9 @@ function FunilConversao() {
               <span style={{ fontSize: 13, fontWeight: 700, color: COLORS.gray700 }}>{e.label}</span>
               <span style={{ fontSize: 13, fontWeight: 900, color: COLORS.gray900 }}>
                 {e.count}
-                {e.taxa_perda_pct != null && (
-                  <span style={{ fontSize: 11, fontWeight: 700, color: COLORS.red, marginLeft: 8 }}>
-                    −{e.taxa_perda_pct}% vs. etapa anterior
+                {e.pct_do_topo != null && (
+                  <span style={{ fontSize: 11, fontWeight: 700, color: COLORS.gray500, marginLeft: 8 }}>
+                    {e.pct_do_topo}% do total
                   </span>
                 )}
               </span>
@@ -91,7 +91,10 @@ export default function Relatorios() {
         <ExportCard titulo="Financeiro" descricao="Assinaturas ativas, plano, status e valor atual." path="/api/admin/export/financeiro" nomeArquivo="financeiro.csv" />
       </div>
 
-      <div style={{ fontSize: 13, fontWeight: 800, color: COLORS.gray700, marginBottom: 10 }}>Funil de conversão do profissional</div>
+      <div style={{ fontSize: 13, fontWeight: 800, color: COLORS.gray700, marginBottom: 2 }}>Funil de conversão do profissional</div>
+      <div style={{ fontSize: 11, color: COLORS.gray400, marginBottom: 10 }}>
+        % do total que iniciou o cadastro — as etapas não são uma esteira estritamente sequencial (documento e aprovação, e pagamento e aprovação, são processos paralelos neste negócio, não um depende do outro pra acontecer).
+      </div>
       <FunilConversao />
 
       <div style={{ fontSize: 13, fontWeight: 800, color: COLORS.gray700, margin: "24px 0 10px" }}>Conciliação Asaas × extrato bancário</div>
