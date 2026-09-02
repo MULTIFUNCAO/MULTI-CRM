@@ -16,6 +16,7 @@ import Vendas from "./Vendas";
 import Demandas from "./Demandas";
 import Relatorios from "./Relatorios";
 import Marketing from "./Marketing";
+import Metas from "./Metas";
 
 // Textos honestos pro que ainda não existe — nunca dado fictício, só a
 // explicação do que falta (regra 35 do documento "COMANDO MASTER").
@@ -34,7 +35,8 @@ const EM_CONSTRUCAO = {
   // painel "Não Fecharam"+reengajamento por push é real (Marketing.jsx);
   // campanhas/UTM e templates continuam honestos sobre o que falta, mas
   // agora numa seção da tela, não bloqueando ela inteira.
-  metas: { title: "Metas & Performance", subtitle: "Metas por empresa, equipe e vendedor", motivo: "Não existe nenhuma configuração de meta no banco ainda." },
+  // "metas" saiu daqui em 2026-09-02 (handoff item 5) — tabela
+  // metas_mensais + Metas.jsx já são reais.
   inteligencia: { title: "Inteligência MULTI", subtitle: "Central de sinais entre módulos", motivo: "Depende dos módulos que ainda não existem (Vendas, Marketing) pra cruzar dado de verdade — construída conforme eles forem nascendo." },
   // "relatorios" saiu daqui em 2026-09-02 (handoff item 5, parcial) —
   // Exportação CSV + Funil de conversão do profissional já são reais
@@ -129,6 +131,8 @@ export default function App() {
       {screen === "relatorios" && <Relatorios />}
 
       {screen === "marketing" && <Marketing />}
+
+      {screen === "metas" && <Metas />}
 
       {screen === "clientes" &&
         (selectedClientEmail ? (
