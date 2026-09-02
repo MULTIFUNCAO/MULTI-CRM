@@ -12,6 +12,7 @@ import MonetizationConfig from "./MonetizationConfig";
 import AdminHome from "./AdminHome";
 import ComingSoon from "./ComingSoon";
 import Inbox from "./Inbox";
+import Vendas from "./Vendas";
 
 // Textos honestos pro que ainda não existe — nunca dado fictício, só a
 // explicação do que falta (regra 35 do documento "COMANDO MASTER").
@@ -20,7 +21,8 @@ const EM_CONSTRUCAO = {
   // já é real (Inbox.jsx), só a aba WhatsApp dentro dela continua honesta
   // sobre o que falta (mesmo motivo de antes, agora só na aba, não na tela
   // inteira). Ver Inbox.jsx MOTIVO_WHATSAPP.
-  vendas: { title: "Vendas", subtitle: "Pipeline comercial", motivo: "Não existe uma tabela de leads/oportunidades comerciais persistida, nem campo de responsável (vendedor) em nenhuma tabela ainda. Infra nova, prioridade a decidir depois da Etapa 1-5." },
+  // "vendas" saiu daqui em 2026-09-02 (handoff item 3) — tabela
+  // vendas_pipeline + Vendas.jsx já são reais.
   demandas: { title: "Demandas", subtitle: "Pipeline operacional", motivo: "Os pedidos já existem e têm dado real (ver Visão Geral e as fichas de Cliente/Profissional), mas ainda não como uma tela de pipeline dedicada com o funil descrito no plano." },
   financeiro: { title: "Financeiro", subtitle: "Receitas, cobranças, inadimplência", motivo: "Monetização (Taxa de Acesso) já existe em Administrativo. Um dashboard financeiro completo (receita/mês/ano, recorrência, inadimplência agregada) ainda não foi construído." },
   marketing: { title: "Marketing", subtitle: "Campanhas e aquisição", motivo: "Não existe rastreamento de origem/campanha (UTM) nem integração com plataformas de anúncio hoje — pedidos.origem só distingue real/demo/suporte, não é dado de marketing." },
@@ -107,6 +109,8 @@ export default function App() {
       {screen === "visao-geral" && <Overview onSelectClient={irParaCliente} onSelectProfessional={irParaProfissional} onUnauthorized={handleUnauthorized} />}
 
       {screen === "inbox" && <Inbox onUnauthorized={handleUnauthorized} />}
+
+      {screen === "vendas" && <Vendas onUnauthorized={handleUnauthorized} />}
 
       {screen === "clientes" &&
         (selectedClientEmail ? (

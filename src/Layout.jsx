@@ -17,7 +17,7 @@ const ROLE_LABEL = {
 export const NAV_ITEMS = [
   { id: "visao-geral", label: "Visão Geral", icon: "🏠", pronto: true },
   { id: "inbox", label: "Inbox", icon: "💬", pronto: true },
-  { id: "vendas", label: "Vendas", icon: "💼", pronto: false },
+  { id: "vendas", label: "Vendas", icon: "💼", pronto: true },
   { id: "demandas", label: "Demandas", icon: "🏠", pronto: false },
   { id: "profissionais", label: "Profissionais", icon: "👷", pronto: true },
   { id: "clientes", label: "Clientes", icon: "👥", pronto: true },
