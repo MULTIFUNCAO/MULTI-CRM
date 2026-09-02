@@ -16,7 +16,7 @@ const ROLE_LABEL = {
 // infra de verdade, em fases futuras aprovadas uma de cada vez.
 export const NAV_ITEMS = [
   { id: "visao-geral", label: "Visão Geral", icon: "🏠", pronto: true },
-  { id: "inbox", label: "Inbox", icon: "💬", pronto: false },
+  { id: "inbox", label: "Inbox", icon: "💬", pronto: true },
   { id: "vendas", label: "Vendas", icon: "💼", pronto: false },
   { id: "demandas", label: "Demandas", icon: "🏠", pronto: false },
   { id: "profissionais", label: "Profissionais", icon: "👷", pronto: true },

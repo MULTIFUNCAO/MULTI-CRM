@@ -11,11 +11,15 @@ import TeamManagement from "./TeamManagement";
 import MonetizationConfig from "./MonetizationConfig";
 import AdminHome from "./AdminHome";
 import ComingSoon from "./ComingSoon";
+import Inbox from "./Inbox";
 
 // Textos honestos pro que ainda não existe — nunca dado fictício, só a
 // explicação do que falta (regra 35 do documento "COMANDO MASTER").
 const EM_CONSTRUCAO = {
-  inbox: { title: "Inbox", subtitle: "Central de comunicação", motivo: "Não existe integração de mensageria hoje (WhatsApp Business API/provedor) — só links wa.me no app do cliente, sem histórico nem envio pelo CRM. Precisa de um provedor contratado e decisão sua antes de existir de verdade." },
+  // "inbox" saiu daqui em 2026-09-02 (handoff item 2) — a metade de Suporte
+  // já é real (Inbox.jsx), só a aba WhatsApp dentro dela continua honesta
+  // sobre o que falta (mesmo motivo de antes, agora só na aba, não na tela
+  // inteira). Ver Inbox.jsx MOTIVO_WHATSAPP.
   vendas: { title: "Vendas", subtitle: "Pipeline comercial", motivo: "Não existe uma tabela de leads/oportunidades comerciais persistida, nem campo de responsável (vendedor) em nenhuma tabela ainda. Infra nova, prioridade a decidir depois da Etapa 1-5." },
   demandas: { title: "Demandas", subtitle: "Pipeline operacional", motivo: "Os pedidos já existem e têm dado real (ver Visão Geral e as fichas de Cliente/Profissional), mas ainda não como uma tela de pipeline dedicada com o funil descrito no plano." },
   financeiro: { title: "Financeiro", subtitle: "Receitas, cobranças, inadimplência", motivo: "Monetização (Taxa de Acesso) já existe em Administrativo. Um dashboard financeiro completo (receita/mês/ano, recorrência, inadimplência agregada) ainda não foi construído." },
@@ -101,6 +105,8 @@ export default function App() {
       onUnauthorized={handleUnauthorized}
     >
       {screen === "visao-geral" && <Overview onSelectClient={irParaCliente} onSelectProfessional={irParaProfissional} onUnauthorized={handleUnauthorized} />}
+
+      {screen === "inbox" && <Inbox onUnauthorized={handleUnauthorized} />}
 
       {screen === "clientes" &&
         (selectedClientEmail ? (
