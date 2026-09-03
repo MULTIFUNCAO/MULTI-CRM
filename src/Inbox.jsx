@@ -1,13 +1,12 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { adminFetch } from "./api";
 import { PageHeader, Card, Badge, EmptyState, COLORS } from "./ui";
 
 // Handoff MULTI-CRM 2026-09-02, item 2 (Caixa de Entrada). Duas abas: Suporte
-// (real, dado real) e WhatsApp (ainda travado — ver motivo abaixo, mesmo
-// texto que já existia em App.jsx/EM_CONSTRUCAO.inbox antes desta tela
-// existir). Regra 35 do documento "COMANDO MASTER": nunca fingir que o
-// WhatsApp já funciona só porque o resto da Caixa de Entrada agora é real.
-const MOTIVO_WHATSAPP = "Não existe integração de mensageria hoje (WhatsApp Business API/provedor) — só links wa.me no app do cliente, sem histórico nem envio pelo CRM. Precisa de um provedor contratado e decisão sua antes de existir de verdade.";
+// (real, dado real) e WhatsApp — 2026-09-03: sai do "ainda travado" (motivo
+// abaixo era o texto original, ver App.jsx/EM_CONSTRUCAO.inbox antigo).
+// Provedor Z-API (QR code, sem aprovação Meta) — decisão do usuário pra MVP,
+// ver handoff. Consome MULTI-BACKEND /api/admin/whatsapp/*.
 
 const PRIORIDADE_TONE = { baixa: "gray", normal: "blue", alta: "red" };
 const STATUS_TONE = { aberto: "red", em_andamento: "amber", resolvido: "green" };
@@ -261,6 +260,225 @@ function Suporte({ onUnauthorized }) {
   );
 }
 
+// Formata telefone só-dígitos (formato Z-API, ex: "5511999998888") pra
+// leitura humana. Fica no melhor-esforço — se não bater no padrão BR
+// DDI+DDD+9dígitos, devolve como veio em vez de inventar formatação errada.
+function formatarTelefone(tel) {
+  const d = String(tel || "").replace(/\D/g, "");
+  const m = d.match(/^55(\d{2})(\d{4,5})(\d{4})$/);
+  if (!m) return d;
+  return `(${m[1]}) ${m[2]}-${m[3]}`;
+}
+
+function horaCurta(iso) {
+  const dt = new Date(iso);
+  const hoje = new Date();
+  const mesmoDia = dt.toDateString() === hoje.toDateString();
+  return mesmoDia
+    ? dt.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })
+    : dt.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+}
+
+function ConversaItem({ conversa, ativa, onClick }) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        display: "block",
+        width: "100%",
+        textAlign: "left",
+        padding: "12px 14px",
+        border: "none",
+        borderBottom: `1px solid ${COLORS.gray100}`,
+        background: ativa ? COLORS.gray50 : "white",
+        cursor: "pointer",
+      }}
+    >
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8 }}>
+        <span style={{ fontWeight: 800, fontSize: 13, color: COLORS.gray900, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {conversa.nomeContato || formatarTelefone(conversa.telefone)}
+        </span>
+        <span style={{ fontSize: 11, color: COLORS.gray400, flexShrink: 0 }}>{horaCurta(conversa.ultimaEm)}</span>
+      </div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, marginTop: 2 }}>
+        <span style={{ fontSize: 12, color: COLORS.gray500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {conversa.ultimaMensagem}
+        </span>
+        {conversa.naoLidas > 0 && (
+          <span style={{ background: COLORS.blue, color: "white", borderRadius: 999, fontSize: 10, fontWeight: 800, padding: "2px 6px", flexShrink: 0 }}>
+            {conversa.naoLidas}
+          </span>
+        )}
+      </div>
+    </button>
+  );
+}
+
+function Bolha({ mensagem }) {
+  const minha = mensagem.direcao === "saida";
+  return (
+    <div style={{ display: "flex", justifyContent: minha ? "flex-end" : "flex-start", marginBottom: 8 }}>
+      <div
+        style={{
+          maxWidth: "72%",
+          background: minha ? COLORS.blue : COLORS.gray100,
+          color: minha ? "white" : COLORS.gray900,
+          borderRadius: 14,
+          borderBottomRightRadius: minha ? 4 : 14,
+          borderBottomLeftRadius: minha ? 14 : 4,
+          padding: "8px 12px",
+          fontSize: 13,
+          whiteSpace: "pre-wrap",
+          wordBreak: "break-word",
+        }}
+      >
+        {mensagem.conteudo}
+        <div style={{ fontSize: 10, marginTop: 4, opacity: 0.7, textAlign: "right" }}>
+          {horaCurta(mensagem.created_at)}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Segunda metade do handoff 2026-09-03 — WhatsApp via Z-API. Layout de duas
+// colunas (lista de conversas + thread), mesma ideia de qualquer cliente de
+// chat. Sem realtime de verdade (sem websocket/Supabase Realtime plugado
+// aqui) — poll simples a cada 10s só na conversa aberta, pra não passar a
+// impressão de "ao vivo" quando não é.
+function WhatsApp({ onUnauthorized }) {
+  const [conversas, setConversas] = useState(null);
+  const [erroConversas, setErroConversas] = useState("");
+  const [ativa, setAtiva] = useState(null); // telefone selecionado
+  const [mensagens, setMensagens] = useState(null);
+  const [erroMensagens, setErroMensagens] = useState("");
+  const [texto, setTexto] = useState("");
+  const [enviando, setEnviando] = useState(false);
+  const [erroEnvio, setErroEnvio] = useState("");
+  const threadRef = useRef(null);
+
+  const carregarConversas = () => {
+    adminFetch("/api/admin/whatsapp/conversas")
+      .then(d => { setConversas(d.conversas || []); setErroConversas(""); })
+      .catch(e => { if (e.unauthorized) return onUnauthorized?.(); setErroConversas(e.message); });
+  };
+
+  const carregarMensagens = (telefone) => {
+    adminFetch(`/api/admin/whatsapp/mensagens/${telefone}`)
+      .then(d => { setMensagens(d.mensagens || []); setErroMensagens(""); })
+      .catch(e => { if (e.unauthorized) return onUnauthorized?.(); setErroMensagens(e.message); });
+  };
+
+  useEffect(carregarConversas, []);
+
+  useEffect(() => {
+    if (!ativa) return;
+    setMensagens(null);
+    carregarMensagens(ativa);
+    const t = setInterval(() => carregarMensagens(ativa), 10000);
+    return () => clearInterval(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ativa]);
+
+  useEffect(() => {
+    if (threadRef.current) threadRef.current.scrollTop = threadRef.current.scrollHeight;
+  }, [mensagens]);
+
+  const abrirConversa = (telefone) => {
+    setAtiva(telefone);
+    // Badge de não lida já é zerada no backend ao buscar as mensagens (GET
+    // marca como lida) — atualiza a lista aqui pra badge sumir na hora.
+    setConversas(cs => (cs || []).map(c => (c.telefone === telefone ? { ...c, naoLidas: 0 } : c)));
+  };
+
+  const enviar = async () => {
+    const mensagem = texto.trim();
+    if (!mensagem || !ativa) return;
+    setErroEnvio("");
+    setEnviando(true);
+    try {
+      await adminFetch("/api/admin/whatsapp/enviar", { method: "POST", body: JSON.stringify({ telefone: ativa, mensagem }) });
+      setTexto("");
+      carregarMensagens(ativa);
+      carregarConversas();
+    } catch (e) {
+      if (e.unauthorized) return onUnauthorized?.();
+      setErroEnvio(e.message);
+    } finally {
+      setEnviando(false);
+    }
+  };
+
+  const conversaAtiva = (conversas || []).find(c => c.telefone === ativa);
+
+  return (
+    <div style={{ display: "flex", gap: 16, height: 560 }}>
+      <Card style={{ padding: 0, width: 300, flexShrink: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+        <div style={{ padding: "12px 14px", borderBottom: `1px solid ${COLORS.gray200}`, fontWeight: 800, fontSize: 13 }}>
+          Conversas
+        </div>
+        <div style={{ overflowY: "auto", flex: 1 }}>
+          {erroConversas ? (
+            <div style={{ padding: 14, color: COLORS.red, fontSize: 12 }}>{erroConversas}</div>
+          ) : conversas === null ? (
+            <div style={{ padding: 20, textAlign: "center", color: COLORS.gray500, fontSize: 13 }}>Carregando...</div>
+          ) : conversas.length === 0 ? (
+            <EmptyState title="Nenhuma conversa" description="Nenhuma mensagem trocada ainda por este número." />
+          ) : (
+            conversas.map(c => (
+              <ConversaItem key={c.telefone} conversa={c} ativa={c.telefone === ativa} onClick={() => abrirConversa(c.telefone)} />
+            ))
+          )}
+        </div>
+      </Card>
+
+      <Card style={{ padding: 0, flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+        {!ativa ? (
+          <EmptyState title="Selecione uma conversa" description="Escolha um contato à esquerda pra ver o histórico." />
+        ) : (
+          <>
+            <div style={{ padding: "12px 16px", borderBottom: `1px solid ${COLORS.gray200}`, fontWeight: 800, fontSize: 13 }}>
+              {conversaAtiva?.nomeContato || formatarTelefone(ativa)}
+              <span style={{ fontWeight: 500, color: COLORS.gray400, marginLeft: 8, fontSize: 12 }}>{formatarTelefone(ativa)}</span>
+            </div>
+            <div ref={threadRef} style={{ flex: 1, overflowY: "auto", padding: 16 }}>
+              {erroMensagens ? (
+                <div style={{ color: COLORS.red, fontSize: 12 }}>{erroMensagens}</div>
+              ) : mensagens === null ? (
+                <div style={{ textAlign: "center", color: COLORS.gray500, fontSize: 13 }}>Carregando...</div>
+              ) : mensagens.length === 0 ? (
+                <div style={{ textAlign: "center", color: COLORS.gray500, fontSize: 13 }}>Sem mensagens ainda.</div>
+              ) : (
+                mensagens.map(m => <Bolha key={m.id} mensagem={m} />)
+              )}
+            </div>
+            <div style={{ borderTop: `1px solid ${COLORS.gray200}`, padding: 12 }}>
+              {erroEnvio && <div style={{ color: COLORS.red, fontSize: 12, marginBottom: 8 }}>{erroEnvio}</div>}
+              <div style={{ display: "flex", gap: 8 }}>
+                <textarea
+                  value={texto}
+                  onChange={e => setTexto(e.target.value)}
+                  onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); enviar(); } }}
+                  placeholder="Digite uma mensagem..."
+                  rows={1}
+                  style={{ flex: 1, padding: 10, borderRadius: 8, border: `1px solid ${COLORS.gray200}`, fontSize: 13, resize: "none", fontFamily: "inherit" }}
+                />
+                <button
+                  onClick={enviar}
+                  disabled={enviando || !texto.trim()}
+                  style={{ background: COLORS.blue, color: "white", border: "none", borderRadius: 8, padding: "0 18px", fontWeight: 800, fontSize: 13, cursor: "pointer", opacity: enviando || !texto.trim() ? 0.6 : 1 }}
+                >
+                  {enviando ? "..." : "Enviar"}
+                </button>
+              </div>
+            </div>
+          </>
+        )}
+      </Card>
+    </div>
+  );
+}
+
 export default function Inbox({ onUnauthorized }) {
   const [tab, setTab] = useState("suporte");
   return (
@@ -268,7 +486,7 @@ export default function Inbox({ onUnauthorized }) {
       <PageHeader title="Caixa de Entrada" subtitle="Suporte a profissionais e mensageria" />
       <Tabs active={tab} onChange={setTab} />
       {tab === "suporte" && <Suporte onUnauthorized={onUnauthorized} />}
-      {tab === "whatsapp" && <Card><EmptyState title="Ainda não construído" description={MOTIVO_WHATSAPP} /></Card>}
+      {tab === "whatsapp" && <WhatsApp onUnauthorized={onUnauthorized} />}
     </div>
   );
 }

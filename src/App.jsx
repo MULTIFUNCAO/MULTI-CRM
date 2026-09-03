@@ -23,9 +23,9 @@ import Inteligencia from "./Inteligencia";
 // explicação do que falta (regra 35 do documento "COMANDO MASTER").
 const EM_CONSTRUCAO = {
   // "inbox" saiu daqui em 2026-09-02 (handoff item 2) — a metade de Suporte
-  // já é real (Inbox.jsx), só a aba WhatsApp dentro dela continua honesta
-  // sobre o que falta (mesmo motivo de antes, agora só na aba, não na tela
-  // inteira). Ver Inbox.jsx MOTIVO_WHATSAPP.
+  // já é real (Inbox.jsx). 2026-09-03: a aba WhatsApp também saiu do
+  // "honesto sobre o que falta" — Z-API integrada (server.js + Inbox.jsx),
+  // a tela inteira agora é real.
   // "vendas" saiu daqui em 2026-09-02 (handoff item 3) — tabela
   // vendas_pipeline + Vendas.jsx já são reais.
   // "demandas" saiu daqui em 2026-09-02 (handoff item 4) — reescopeado:
@@ -45,7 +45,7 @@ const EM_CONSTRUCAO = {
   // Exportação CSV + Funil de conversão do profissional já são reais
   // (Relatorios.jsx). Conciliação Asaas×extrato bancário continua honesta
   // sobre o que falta, mas agora só numa seção da tela, não bloqueando ela
-  // inteira (mesmo padrão já usado no Inbox pra WhatsApp).
+  // inteira (mesmo padrão já usado no Marketing pra campanhas/UTM).
 };
 
 // Máquina de telas — MULTI Command Center, Etapa 1-5 (ver memória do
