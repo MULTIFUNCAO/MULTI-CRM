@@ -18,6 +18,12 @@ export const NAV_ITEMS = [
   { id: "visao-geral", label: "Visão Geral", icon: "🏠", pronto: true },
   { id: "inbox", label: "Inbox", icon: "💬", pronto: true },
   { id: "vendas", label: "Vendas", icon: "💼", pronto: true },
+  // "atendimentos" — especificação "Fila de Demandas de Clientes + Triagem
+  // do WhatsApp" (2026-09-03). Não faz parte dos 12 módulos originais do
+  // documento "COMANDO MASTER" — módulo novo aprovado à parte. Não confundir
+  // com "demandas" logo abaixo (lista pessoal de tarefas, sem relação com
+  // clientes).
+  { id: "atendimentos", label: "Atendimentos", icon: "🧰", pronto: true },
   { id: "demandas", label: "Demandas", icon: "🏠", pronto: true },
   { id: "profissionais", label: "Profissionais", icon: "👷", pronto: true },
   { id: "clientes", label: "Clientes", icon: "👥", pronto: true },

@@ -13,6 +13,7 @@ import AdminHome from "./AdminHome";
 import ComingSoon from "./ComingSoon";
 import Inbox from "./Inbox";
 import Vendas from "./Vendas";
+import Atendimentos from "./Atendimentos";
 import Demandas from "./Demandas";
 import Relatorios from "./Relatorios";
 import Marketing from "./Marketing";
@@ -128,6 +129,8 @@ export default function App() {
       {screen === "inbox" && <Inbox onUnauthorized={handleUnauthorized} />}
 
       {screen === "vendas" && <Vendas onUnauthorized={handleUnauthorized} />}
+
+      {screen === "atendimentos" && <Atendimentos onUnauthorized={handleUnauthorized} />}
 
       {screen === "demandas" && <Demandas onUnauthorized={handleUnauthorized} />}
 

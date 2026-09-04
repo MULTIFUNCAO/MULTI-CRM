@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { adminFetch } from "./api";
 import { PageHeader, Card, Badge, EmptyState, COLORS } from "./ui";
+import { WhatsApp } from "./Inbox";
 
 // Handoff MULTI-CRM 2026-09-02, item 3. Pipeline dos profissionais "em
 // atendimento" — opt-in (a equipe adiciona quem está trabalhando de
@@ -95,6 +96,7 @@ function LeadCard({ lead, onMover, onRemover }) {
 }
 
 export default function Vendas({ onUnauthorized }) {
+  const [aba, setAba] = useState("funil");
   const [leads, setLeads] = useState(null);
   const [mostrarForm, setMostrarForm] = useState(false);
   const [error, setError] = useState("");
@@ -133,43 +135,71 @@ export default function Vendas({ onUnauthorized }) {
         title="Vendas"
         subtitle="Pipeline de profissionais em atendimento"
         actions={
-          <button onClick={() => setMostrarForm(v => !v)} style={{ background: COLORS.blue, color: "white", border: "none", borderRadius: 8, padding: "8px 16px", fontWeight: 800, fontSize: 13, cursor: "pointer" }}>
-            {mostrarForm ? "Fechar" : "+ Adicionar ao funil"}
-          </button>
+          aba === "funil" && (
+            <button onClick={() => setMostrarForm(v => !v)} style={{ background: COLORS.blue, color: "white", border: "none", borderRadius: 8, padding: "8px 16px", fontWeight: 800, fontSize: 13, cursor: "pointer" }}>
+              {mostrarForm ? "Fechar" : "+ Adicionar ao funil"}
+            </button>
+          )
         }
       />
 
-      {error && <div style={{ background: COLORS.redBg, color: COLORS.red, padding: 12, borderRadius: 10, marginBottom: 14, fontSize: 13 }}>{error}</div>}
+      {/* Sub-abas — "WhatsApp" reaproveita o componente de Inbox.jsx filtrado
+          por fila='vendas' (especificação "Fila de Demandas de Clientes",
+          2026-09-03): conversas movidas pra cá na Caixa de Entrada. */}
+      <div style={{ display: "flex", gap: 4, marginBottom: 18, borderBottom: `1px solid ${COLORS.gray200}` }}>
+        {[{ id: "funil", label: "Funil" }, { id: "whatsapp", label: "WhatsApp" }].map(t => (
+          <button
+            key={t.id}
+            onClick={() => setAba(t.id)}
+            style={{
+              padding: "10px 16px", border: "none", background: "none",
+              borderBottom: aba === t.id ? `2px solid ${COLORS.blue}` : "2px solid transparent",
+              color: aba === t.id ? COLORS.blue : COLORS.gray500,
+              fontWeight: 800, fontSize: 13, cursor: "pointer", marginBottom: -1,
+            }}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
 
-      {mostrarForm && (
-        <NovoLeadForm onCreated={() => { setMostrarForm(false); carregar(); }} onCancel={() => setMostrarForm(false)} />
-      )}
+      {aba === "whatsapp" && <WhatsApp onUnauthorized={onUnauthorized} filaFiltro="vendas" />}
 
-      {leads === null ? (
-        <div style={{ padding: 40, textAlign: "center", color: COLORS.gray500 }}>Carregando...</div>
-      ) : leads.length === 0 ? (
-        <Card><EmptyState title="Ninguém no funil ainda" description="Adicione um profissional que a equipe esteja trabalhando ativamente pra fechar o cadastro." /></Card>
-      ) : (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))", gap: 14 }}>
-          {ESTAGIOS.map(estagio => {
-            const doEstagio = leads.filter(l => l.estagio === estagio.id);
-            return (
-              <div key={estagio.id}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-                  <Badge tone={estagio.cor}>{estagio.label}</Badge>
-                  <span style={{ fontSize: 12, color: COLORS.gray400, fontWeight: 700 }}>{doEstagio.length}</span>
-                </div>
-                {doEstagio.length === 0 ? (
-                  <div style={{ fontSize: 12, color: COLORS.gray400, padding: "12px 0" }}>Vazio</div>
-                ) : (
-                  doEstagio.map(lead => (
-                    <LeadCard key={lead.id} lead={lead} onMover={mover} onRemover={remover} />
-                  ))
-                )}
-              </div>
-            );
-          })}
-        </div>
+      {aba === "funil" && (
+        <>
+          {error && <div style={{ background: COLORS.redBg, color: COLORS.red, padding: 12, borderRadius: 10, marginBottom: 14, fontSize: 13 }}>{error}</div>}
+
+          {mostrarForm && (
+            <NovoLeadForm onCreated={() => { setMostrarForm(false); carregar(); }} onCancel={() => setMostrarForm(false)} />
+          )}
+
+          {leads === null ? (
+            <div style={{ padding: 40, textAlign: "center", color: COLORS.gray500 }}>Carregando...</div>
+          ) : leads.length === 0 ? (
+            <Card><EmptyState title="Ninguém no funil ainda" description="Adicione um profissional que a equipe esteja trabalhando ativamente pra fechar o cadastro." /></Card>
+          ) : (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))", gap: 14 }}>
+              {ESTAGIOS.map(estagio => {
+                const doEstagio = leads.filter(l => l.estagio === estagio.id);
+                return (
+                  <div key={estagio.id}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+                      <Badge tone={estagio.cor}>{estagio.label}</Badge>
+                      <span style={{ fontSize: 12, color: COLORS.gray400, fontWeight: 700 }}>{doEstagio.length}</span>
+                    </div>
+                    {doEstagio.length === 0 ? (
+                      <div style={{ fontSize: 12, color: COLORS.gray400, padding: "12px 0" }}>Vazio</div>
+                    ) : (
+                      doEstagio.map(lead => (
+                        <LeadCard key={lead.id} lead={lead} onMover={mover} onRemover={remover} />
+                      ))
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </>
       )}
     </div>
   );

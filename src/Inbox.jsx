@@ -179,6 +179,7 @@ function TicketCard({ ticket, onAssumir, onResolver }) {
 }
 
 function Suporte({ onUnauthorized }) {
+  const [aba, setAba] = useState("tickets");
   const [tickets, setTickets] = useState(null);
   const [filtro, setFiltro] = useState("todos");
   const [mostrarForm, setMostrarForm] = useState(false);
@@ -207,54 +208,81 @@ function Suporte({ onUnauthorized }) {
 
   return (
     <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14, flexWrap: "wrap", gap: 10 }}>
-        <div style={{ display: "flex", gap: 6 }}>
-          {["todos", "aberto", "em_andamento", "resolvido"].map(s => (
-            <button
-              key={s}
-              onClick={() => setFiltro(s)}
-              style={{
-                padding: "6px 12px",
-                borderRadius: 999,
-                border: `1px solid ${filtro === s ? COLORS.blue : COLORS.gray200}`,
-                background: filtro === s ? COLORS.blue : "white",
-                color: filtro === s ? "white" : COLORS.gray700,
-                fontWeight: 700,
-                fontSize: 12,
-                cursor: "pointer",
-              }}
-            >
-              {s === "todos" ? "Todos" : STATUS_LABEL[s]} ({contagem(s)})
-            </button>
-          ))}
-        </div>
-        <button onClick={() => setMostrarForm(v => !v)} style={{ background: COLORS.blue, color: "white", border: "none", borderRadius: 8, padding: "8px 16px", fontWeight: 800, fontSize: 13, cursor: "pointer" }}>
-          {mostrarForm ? "Fechar" : "+ Novo ticket"}
-        </button>
+      {/* Sub-abas — "WhatsApp" reaproveita o componente de cima filtrado por
+          fila='suporte' (especificação "Fila de Demandas de Clientes",
+          2026-09-03): conversas movidas pra cá na aba WhatsApp da Caixa de
+          Entrada. "Tickets" é o módulo de Suporte original, intocado. */}
+      <div style={{ display: "flex", gap: 4, marginBottom: 18, borderBottom: `1px solid ${COLORS.gray200}` }}>
+        {[{ id: "tickets", label: "Tickets" }, { id: "whatsapp", label: "WhatsApp" }].map(t => (
+          <button
+            key={t.id}
+            onClick={() => setAba(t.id)}
+            style={{
+              padding: "10px 16px", border: "none", background: "none",
+              borderBottom: aba === t.id ? `2px solid ${COLORS.blue}` : "2px solid transparent",
+              color: aba === t.id ? COLORS.blue : COLORS.gray500,
+              fontWeight: 800, fontSize: 13, cursor: "pointer", marginBottom: -1,
+            }}
+          >
+            {t.label}
+          </button>
+        ))}
       </div>
 
-      {error && <div style={{ background: COLORS.redBg, color: COLORS.red, padding: 12, borderRadius: 10, marginBottom: 14, fontSize: 13 }}>{error}</div>}
+      {aba === "whatsapp" && <WhatsApp onUnauthorized={onUnauthorized} filaFiltro="suporte" />}
 
-      {mostrarForm && (
-        <NovoTicketForm
-          onCreated={() => { setMostrarForm(false); carregar(); }}
-          onCancel={() => setMostrarForm(false)}
-        />
-      )}
+      {aba === "tickets" && (
+        <>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14, flexWrap: "wrap", gap: 10 }}>
+            <div style={{ display: "flex", gap: 6 }}>
+              {["todos", "aberto", "em_andamento", "resolvido"].map(s => (
+                <button
+                  key={s}
+                  onClick={() => setFiltro(s)}
+                  style={{
+                    padding: "6px 12px",
+                    borderRadius: 999,
+                    border: `1px solid ${filtro === s ? COLORS.blue : COLORS.gray200}`,
+                    background: filtro === s ? COLORS.blue : "white",
+                    color: filtro === s ? "white" : COLORS.gray700,
+                    fontWeight: 700,
+                    fontSize: 12,
+                    cursor: "pointer",
+                  }}
+                >
+                  {s === "todos" ? "Todos" : STATUS_LABEL[s]} ({contagem(s)})
+                </button>
+              ))}
+            </div>
+            <button onClick={() => setMostrarForm(v => !v)} style={{ background: COLORS.blue, color: "white", border: "none", borderRadius: 8, padding: "8px 16px", fontWeight: 800, fontSize: 13, cursor: "pointer" }}>
+              {mostrarForm ? "Fechar" : "+ Novo ticket"}
+            </button>
+          </div>
 
-      {tickets === null ? (
-        <div style={{ padding: 40, textAlign: "center", color: COLORS.gray500 }}>Carregando...</div>
-      ) : filtrados.length === 0 ? (
-        <Card><EmptyState title="Nenhum ticket" description={filtro === "todos" ? "Nenhum ticket de suporte aberto ainda." : `Nenhum ticket com status "${STATUS_LABEL[filtro] || filtro}".`} /></Card>
-      ) : (
-        filtrados.map(t => (
-          <TicketCard
-            key={t.id}
-            ticket={t}
-            onAssumir={(id) => acao(id, { assumir: true })}
-            onResolver={(id, nota) => acao(id, { status: "resolvido", resolucaoNota: nota })}
-          />
-        ))
+          {error && <div style={{ background: COLORS.redBg, color: COLORS.red, padding: 12, borderRadius: 10, marginBottom: 14, fontSize: 13 }}>{error}</div>}
+
+          {mostrarForm && (
+            <NovoTicketForm
+              onCreated={() => { setMostrarForm(false); carregar(); }}
+              onCancel={() => setMostrarForm(false)}
+            />
+          )}
+
+          {tickets === null ? (
+            <div style={{ padding: 40, textAlign: "center", color: COLORS.gray500 }}>Carregando...</div>
+          ) : filtrados.length === 0 ? (
+            <Card><EmptyState title="Nenhum ticket" description={filtro === "todos" ? "Nenhum ticket de suporte aberto ainda." : `Nenhum ticket com status "${STATUS_LABEL[filtro] || filtro}".`} /></Card>
+          ) : (
+            filtrados.map(t => (
+              <TicketCard
+                key={t.id}
+                ticket={t}
+                onAssumir={(id) => acao(id, { assumir: true })}
+                onResolver={(id, nota) => acao(id, { status: "resolvido", resolucaoNota: nota })}
+              />
+            ))
+          )}
+        </>
       )}
     </div>
   );
@@ -346,7 +374,13 @@ function Bolha({ mensagem }) {
 // chat. Sem realtime de verdade (sem websocket/Supabase Realtime plugado
 // aqui) — poll simples a cada 10s só na conversa aberta, pra não passar a
 // impressão de "ao vivo" quando não é.
-function WhatsApp({ onUnauthorized }) {
+// filaFiltro opcional ('vendas' | 'suporte' | 'demanda') — quando presente,
+// só lista conversas já triadas pra essa fila (ver "Mover para fila" acima e
+// GET /api/admin/whatsapp/conversas?fila= no backend). Sem o parâmetro
+// (aba WhatsApp da Caixa de Entrada), lista todas — é onde a triagem inicial
+// acontece. Exportado pra Vendas.jsx e pro sub-tab de Suporte reaproveitarem
+// em vez de duplicar a tela inteira.
+export function WhatsApp({ onUnauthorized, filaFiltro }) {
   const [conversas, setConversas] = useState(null);
   const [erroConversas, setErroConversas] = useState("");
   const [ativa, setAtiva] = useState(null); // telefone selecionado
@@ -355,10 +389,13 @@ function WhatsApp({ onUnauthorized }) {
   const [texto, setTexto] = useState("");
   const [enviando, setEnviando] = useState(false);
   const [erroEnvio, setErroEnvio] = useState("");
+  const [menuFila, setMenuFila] = useState(false); // popover "Mover para fila"
+  const [modalFila, setModalFila] = useState(null); // { fila } | null — abre o mini-form
   const threadRef = useRef(null);
 
   const carregarConversas = () => {
-    adminFetch("/api/admin/whatsapp/conversas")
+    const qs = filaFiltro ? `?fila=${filaFiltro}` : "";
+    adminFetch(`/api/admin/whatsapp/conversas${qs}`)
       .then(d => { setConversas(d.conversas || []); setErroConversas(""); })
       .catch(e => { if (e.unauthorized) return onUnauthorized?.(); setErroConversas(e.message); });
   };
@@ -369,7 +406,7 @@ function WhatsApp({ onUnauthorized }) {
       .catch(e => { if (e.unauthorized) return onUnauthorized?.(); setErroMensagens(e.message); });
   };
 
-  useEffect(carregarConversas, []);
+  useEffect(carregarConversas, [filaFiltro]);
 
   useEffect(() => {
     if (!ativa) return;
@@ -437,9 +474,34 @@ function WhatsApp({ onUnauthorized }) {
           <EmptyState title="Selecione uma conversa" description="Escolha um contato à esquerda pra ver o histórico." />
         ) : (
           <>
-            <div style={{ padding: "12px 16px", borderBottom: `1px solid ${COLORS.gray200}`, fontWeight: 800, fontSize: 13 }}>
-              {conversaAtiva?.nomeContato || formatarTelefone(ativa)}
-              <span style={{ fontWeight: 500, color: COLORS.gray400, marginLeft: 8, fontSize: 12 }}>{formatarTelefone(ativa)}</span>
+            <div style={{ padding: "12px 16px", borderBottom: `1px solid ${COLORS.gray200}`, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+              <div style={{ fontWeight: 800, fontSize: 13 }}>
+                {conversaAtiva?.nomeContato || formatarTelefone(ativa)}
+                <span style={{ fontWeight: 500, color: COLORS.gray400, marginLeft: 8, fontSize: 12 }}>{formatarTelefone(ativa)}</span>
+              </div>
+              <div style={{ position: "relative" }}>
+                <button
+                  onClick={() => setMenuFila(v => !v)}
+                  style={{ background: COLORS.gray100, border: "none", borderRadius: 8, padding: "7px 12px", fontWeight: 800, fontSize: 12, color: COLORS.gray700, cursor: "pointer", whiteSpace: "nowrap" }}
+                >
+                  Mover para fila ▾
+                </button>
+                {menuFila && (
+                  <div style={{ position: "absolute", top: "100%", right: 0, marginTop: 4, background: "white", border: `1px solid ${COLORS.gray200}`, borderRadius: 10, boxShadow: "0 4px 16px rgba(0,0,0,.1)", zIndex: 10, overflow: "hidden", minWidth: 140 }}>
+                    {[{ id: "demanda", label: "Demanda" }, { id: "vendas", label: "Vendas" }, { id: "suporte", label: "Suporte" }].map(f => (
+                      <button
+                        key={f.id}
+                        onClick={() => { setMenuFila(false); setModalFila({ fila: f.id }); }}
+                        style={{ display: "block", width: "100%", textAlign: "left", padding: "10px 14px", border: "none", background: "white", fontSize: 13, fontWeight: 700, color: COLORS.gray900, cursor: "pointer" }}
+                        onMouseEnter={e => e.currentTarget.style.background = COLORS.gray50}
+                        onMouseLeave={e => e.currentTarget.style.background = "white"}
+                      >
+                        {f.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
             <div ref={threadRef} style={{ flex: 1, overflowY: "auto", padding: 16 }}>
               {erroMensagens ? (
@@ -475,6 +537,108 @@ function WhatsApp({ onUnauthorized }) {
           </>
         )}
       </Card>
+
+      {modalFila && (
+        <MoverParaFilaModal
+          fila={modalFila.fila}
+          telefone={ativa}
+          descricaoSugerida={[...(mensagens || [])].reverse().find(m => m.direcao === "entrada")?.conteudo || ""}
+          onClose={() => setModalFila(null)}
+          onUnauthorized={onUnauthorized}
+        />
+      )}
+    </div>
+  );
+}
+
+const FILA_LABEL = { demanda: "Demanda", vendas: "Vendas", suporte: "Suporte" };
+
+// Mini-formulário da ação "Mover para fila" (especificação "Fila de Demandas
+// de Clientes + Triagem do WhatsApp", 2026-09-03) — cria um registro em
+// demandas_clientes vinculado à conversa (POST /api/admin/demandas). Região e
+// categoria pré-preenchem só quando dá pra sugerir sem inventar (aqui,
+// nenhuma — a especificação permite prefill "se o texto da conversa já
+// sugerir algo, sem forçar", mas isso exigiria casar texto livre contra as
+// 157 categorias reais do produto; deixado de fora nesta primeira versão pra
+// não arriscar sugerir categoria errada — só a descrição prefilla, com a
+// última mensagem recebida, que é sempre segura de reaproveitar).
+function MoverParaFilaModal({ fila, telefone, descricaoSugerida, onClose, onUnauthorized }) {
+  const [regiao, setRegiao] = useState("");
+  const [categoriaServico, setCategoriaServico] = useState("");
+  const [descricao, setDescricao] = useState(descricaoSugerida);
+  const [salvando, setSalvando] = useState(false);
+  const [erro, setErro] = useState("");
+  const [sucesso, setSucesso] = useState(false);
+
+  const salvar = async () => {
+    setErro("");
+    setSalvando(true);
+    try {
+      await adminFetch("/api/admin/demandas", {
+        method: "POST",
+        body: JSON.stringify({ telefoneCliente: telefone, fila, regiao: regiao.trim() || null, categoriaServico: categoriaServico.trim() || null, descricao: descricao.trim() || null }),
+      });
+      setSucesso(true);
+      setTimeout(onClose, 1200);
+    } catch (e) {
+      if (e.unauthorized) return onUnauthorized?.();
+      setErro(e.message);
+    } finally {
+      setSalvando(false);
+    }
+  };
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100 }} onClick={onClose}>
+      <div onClick={e => e.stopPropagation()} style={{ background: "white", borderRadius: 16, padding: 24, width: "100%", maxWidth: 420 }}>
+        {sucesso ? (
+          <div style={{ textAlign: "center", padding: "20px 0" }}>
+            <div style={{ fontSize: 32, marginBottom: 8 }}>✅</div>
+            <div style={{ fontWeight: 800, fontSize: 15 }}>Movido para {FILA_LABEL[fila]}</div>
+          </div>
+        ) : (
+          <>
+            <div style={{ fontWeight: 800, fontSize: 15, marginBottom: 4 }}>Mover para {FILA_LABEL[fila]}</div>
+            <div style={{ fontSize: 12, color: COLORS.gray500, marginBottom: 16 }}>{formatarTelefone(telefone)}</div>
+
+            <label style={{ fontSize: 12, fontWeight: 700, color: COLORS.gray700, display: "block", marginBottom: 4 }}>Região (cidade/bairro)</label>
+            <input
+              value={regiao}
+              onChange={e => setRegiao(e.target.value)}
+              placeholder="Ex: São Paulo/SP"
+              style={{ width: "100%", padding: 10, borderRadius: 8, border: `1px solid ${COLORS.gray200}`, fontSize: 13, boxSizing: "border-box", marginBottom: 12 }}
+            />
+
+            <label style={{ fontSize: 12, fontWeight: 700, color: COLORS.gray700, display: "block", marginBottom: 4 }}>Categoria de serviço</label>
+            <input
+              value={categoriaServico}
+              onChange={e => setCategoriaServico(e.target.value)}
+              placeholder="Ex: montador_moveis"
+              style={{ width: "100%", padding: 10, borderRadius: 8, border: `1px solid ${COLORS.gray200}`, fontSize: 13, boxSizing: "border-box", marginBottom: 12 }}
+            />
+
+            <label style={{ fontSize: 12, fontWeight: 700, color: COLORS.gray700, display: "block", marginBottom: 4 }}>Descrição</label>
+            <textarea
+              value={descricao}
+              onChange={e => setDescricao(e.target.value)}
+              rows={3}
+              placeholder="O que o cliente precisa..."
+              style={{ width: "100%", padding: 10, borderRadius: 8, border: `1px solid ${COLORS.gray200}`, fontSize: 13, boxSizing: "border-box", resize: "vertical", marginBottom: 16, fontFamily: "inherit" }}
+            />
+
+            {erro && <div style={{ color: COLORS.red, fontSize: 12, marginBottom: 12 }}>{erro}</div>}
+
+            <div style={{ display: "flex", gap: 8 }}>
+              <button onClick={salvar} disabled={salvando} style={{ flex: 1, background: COLORS.blue, color: "white", border: "none", borderRadius: 8, padding: "10px 0", fontWeight: 800, fontSize: 13, cursor: "pointer", opacity: salvando ? 0.6 : 1 }}>
+                {salvando ? "Salvando..." : "Confirmar"}
+              </button>
+              <button onClick={onClose} disabled={salvando} style={{ background: "none", border: `1px solid ${COLORS.gray200}`, borderRadius: 8, padding: "10px 18px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
+                Cancelar
+              </button>
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 }
