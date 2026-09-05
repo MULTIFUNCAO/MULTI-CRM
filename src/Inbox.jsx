@@ -570,6 +570,25 @@ function MoverParaFilaModal({ fila, telefone, descricaoSugerida, onClose, onUnau
   const [erro, setErro] = useState("");
   const [sucesso, setSucesso] = useState(false);
 
+  // Bug real (2026-09-05): navegar pra outra tela (ex: clicar em "Vendas" na
+  // sidebar) enquanto o card de sucesso ainda está visível derrubava a app
+  // inteira com "NotFoundError: Failed to execute 'removeChild'". O
+  // setTimeout(onClose, 1200) abaixo não tinha cleanup — se o componente
+  // desmontasse antes dele disparar, o callback rodava depois sobre uma
+  // instância já desmontada, colidindo com a remoção de DOM que o React já
+  // tinha feito ao trocar de tela. montadoRef evita setState pós-unmount no
+  // fluxo assíncrono do fetch; o useEffect abaixo garante que o temporizador
+  // do auto-close é cancelado se o modal sumir antes da hora.
+  const montadoRef = useRef(true);
+  useEffect(() => () => { montadoRef.current = false; }, []);
+
+  useEffect(() => {
+    if (!sucesso) return;
+    const t = setTimeout(onClose, 1200);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sucesso]);
+
   const salvar = async () => {
     setErro("");
     setSalvando(true);
@@ -578,13 +597,14 @@ function MoverParaFilaModal({ fila, telefone, descricaoSugerida, onClose, onUnau
         method: "POST",
         body: JSON.stringify({ telefoneCliente: telefone, fila, regiao: regiao.trim() || null, categoriaServico: categoriaServico.trim() || null, descricao: descricao.trim() || null }),
       });
+      if (!montadoRef.current) return;
       setSucesso(true);
-      setTimeout(onClose, 1200);
     } catch (e) {
+      if (!montadoRef.current) return;
       if (e.unauthorized) return onUnauthorized?.();
       setErro(e.message);
     } finally {
-      setSalvando(false);
+      if (montadoRef.current) setSalvando(false);
     }
   };
 
