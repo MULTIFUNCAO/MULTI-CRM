@@ -61,7 +61,13 @@ export async function adminFetch(path, options = {}) {
   let body = null;
   try { body = await res.json(); } catch { /* resposta sem corpo JSON */ }
   if (!res.ok) {
-    throw new Error(body?.error || `Erro ${res.status} ao chamar ${path}`);
+    const err = new Error(body?.error || `Erro ${res.status} ao chamar ${path}`);
+    // Fase 3 do diagnóstico de estrutura do CRM (2026-09-06): 409 de
+    // /api/admin/vendas-pipeline manda "candidatos" (telefone ambíguo,
+    // bate com mais de um cadastro) — repassa pra quem chamou decidir,
+    // sem precisar reimplementar o fetch cru só por causa desse campo.
+    if (body?.candidatos) err.candidatos = body.candidatos;
+    throw err;
   }
   return body;
 }
