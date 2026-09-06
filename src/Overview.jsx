@@ -24,19 +24,42 @@ function formatHoras(h) {
   return h < 24 ? `${h}h parado` : `${Math.round(h / 24)}d parado`;
 }
 
+// Fase 1 do diagnóstico de estrutura do CRM (2026-09-06): "sem_proposta" e
+// "proposta_sem_resposta" têm definição técnica real no backend (ver
+// GET /api/admin/oportunidades), mas nunca foram validados como regra de
+// negócio nem explicados pra quem usa o painel — ocultos deste bloco até a
+// Fase 6 (Demandas/Match) decidir se isso vira um conceito real. Continuam
+// existindo no sino de notificações (Layout.jsx/useAlerts.js), que não foi
+// tocado nesta fase — só a Visão Geral parou de mostrar esses dois tipos.
+const TIPOS_OCULTOS_VISAO_GERAL = ["sem_proposta", "proposta_sem_resposta"];
+
 // Visão Geral — o Command Center (Etapa 4 do plano aprovado). Funde o que
 // antes eram duas telas separadas (Dashboard + Central de Operações, Fases
 // 2 e 4) numa só, como a estrutura obrigatória pede — nada duplicado, só
 // reorganizado. Nenhuma métrica nova inventada; "Meta" fica com estado
 // vazio honesto porque não existe config de meta ainda (regra 35 do
 // documento: zero dado fictício).
-export default function Overview({ onSelectClient, onSelectProfessional, onUnauthorized }) {
+//
+// onNavigate / onFilterProfessionals (Fase 1 do diagnóstico de estrutura do
+// CRM, 2026-09-06): plumbing pros StatTiles clicáveis — reaproveita a MESMA
+// navegação por estado que já existe em App.jsx (onSelectClient/
+// onSelectProfessional), sem router novo nem tela nova.
+export default function Overview({ onSelectClient, onSelectProfessional, onUnauthorized, onNavigate, onFilterProfessionals }) {
   const [stats, setStats] = useState(null);
   const [funil, setFunil] = useState(null);
   const [categorias, setCategorias] = useState(null);
   const [error, setError] = useState("");
   const [tipoSelecionado, setTipoSelecionado] = useState(null);
   const alertas = useAlerts(onUnauthorized);
+
+  // Detalhe de "Pedidos"/"Concluídos" ao clicar (Fase 1 do diagnóstico de
+  // estrutura do CRM, 2026-09-06) — reaproveita GET /api/admin/services
+  // (já existente, usado hoje só pela tela de suporte MULTI-SUP) em vez de
+  // criar uma aba "Serviços" nova (isso é Fase 5, fora do escopo desta
+  // sessão). Carrega uma vez, sob demanda, e filtra no cliente.
+  const [pedidosDetalheTipo, setPedidosDetalheTipo] = useState(null); // 'todos' | 'concluidos' | null
+  const [servicesDetalhe, setServicesDetalhe] = useState(null);
+  const [servicesErro, setServicesErro] = useState("");
 
   useEffect(() => {
     const handleErr = (err) => {
@@ -51,10 +74,31 @@ export default function Overview({ onSelectClient, onSelectProfessional, onUnaut
   const carregando = !stats || !funil || !categorias || alertas.carregando;
   const topCategorias = (categorias || []).slice(0, 8);
   const funilComDados = (funil || []).filter((f) => f.count > 0);
+  const tiposVisiveis = alertas.tipos.filter((t) => !TIPOS_OCULTOS_VISAO_GERAL.includes(t.id));
   const itensDoTipo = useMemo(
     () => (tipoSelecionado ? alertas.itensDoTipo(tipoSelecionado) : []),
     [tipoSelecionado, alertas]
   );
+
+  // ORIGEM: tabela pedidos → campo origem → condição != 'demo' (mesmo
+  // critério de /api/admin/stats) → lista de pedidos reais; 'concluidos'
+  // filtra além disso por status='concluido' (mesma condição de
+  // pedidosConcluidos/valorMovimentado em /api/admin/stats).
+  const servicesFiltrados = useMemo(() => {
+    if (!servicesDetalhe || !pedidosDetalheTipo) return [];
+    const reais = servicesDetalhe.filter((s) => s.origem !== "demo");
+    return pedidosDetalheTipo === "concluidos" ? reais.filter((s) => s.status === "concluido") : reais;
+  }, [servicesDetalhe, pedidosDetalheTipo]);
+
+  const abrirDetalhePedidos = (tipo) => {
+    setTipoSelecionado(null); // os dois painéis de detalhe não ficam abertos juntos
+    setPedidosDetalheTipo((atual) => (atual === tipo ? null : tipo));
+    if (!servicesDetalhe && !servicesErro) {
+      adminFetch("/api/admin/services")
+        .then((d) => setServicesDetalhe(d.services || []))
+        .catch((e) => { if (e.unauthorized) return onUnauthorized(); setServicesErro(e.message); });
+    }
+  };
 
   return (
     <div style={{ padding: "24px 28px" }}>
@@ -68,22 +112,95 @@ export default function Overview({ onSelectClient, onSelectProfessional, onUnaut
 
       {!carregando && (
         <>
-          {/* Bloco 1 — Resumo */}
+          {/* Bloco 1 — Resumo. Cada StatTile clicável (Fase 1 do diagnóstico
+              de estrutura do CRM, 2026-09-06) abre a lista que originou o
+              número — ORIGEM de cada indicador documentada junto do onClick.
+              "Clientes"/"Profissionais" navegam pras telas correspondentes
+              (já existiam, só sem esse atalho); "Receita recorrente" filtra
+              Profissionais por quem paga de fato; "Pedidos"/"Concluídos"
+              expandem uma lista inline (não existe aba "Serviços" ainda —
+              isso é Fase 5, fora do escopo desta sessão). */}
           <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginBottom: 20 }}>
-            <StatTile label="Clientes" value={stats.totalClients} icon="👥" />
-            <StatTile label="Profissionais" value={stats.totalPros} icon="🛠️" />
-            <StatTile label="Receita recorrente" value={formatMoney(stats.mrr)} icon="🔁" sub={`${stats.proAtivos} assinantes ativos`} />
-            <StatTile label="Pedidos" value={stats.totalPedidos} icon="📋" />
-            <StatTile label="Fechados" value={stats.pedidosFechados} icon="🤝" />
+            {/* ORIGEM: usuarios → role → ='client' → count */}
+            <StatTile label="Clientes" value={stats.totalClients} icon="👥" onClick={() => onNavigate?.("clientes")} />
+            {/* ORIGEM: usuarios → role → ='professional' → count */}
+            <StatTile label="Profissionais" value={stats.totalPros} icon="🛠️" onClick={() => onNavigate?.("profissionais")} />
+            {/* ORIGEM: assinaturas → statusPagamentoAssinatura(a)==='pago' (asaas_customer_id/cortesia + não vencida) → count/soma.
+                Abre Profissionais filtrado por paymentStatus='pago' — só cobre
+                titular_tipo='usuario' (o MRR também soma 'empresa', que não
+                tem tela própria no CRM ainda; a lista aberta é um subconjunto
+                honesto, não o total exato do card). */}
+            <StatTile
+              label="Receita recorrente"
+              value={formatMoney(stats.mrr)}
+              icon="🔁"
+              sub={`${stats.proAtivos} assinantes ativos`}
+              onClick={() => onFilterProfessionals?.("pago")}
+            />
+            {/* ORIGEM: pedidos → origem → != 'demo' → count */}
+            <StatTile label="Pedidos" value={stats.totalPedidos} icon="📋" onClick={() => abrirDetalhePedidos("todos")} />
+            {/* ORIGEM: pedidos → status → = 'concluido' → count. Renomeado de
+                "Fechados" nesta fase — o nome antigo media aceite de
+                proposta (profissional_aceito preenchido), não conclusão real
+                do serviço; ver /api/admin/stats. */}
+            <StatTile label="Concluídos" value={stats.pedidosConcluidos} icon="✅" onClick={() => abrirDetalhePedidos("concluidos")} />
           </div>
+
+          {pedidosDetalheTipo && (
+            <Card style={{ marginBottom: 20 }}>
+              <div style={{ fontWeight: 800, fontSize: 13, marginBottom: 10 }}>
+                {pedidosDetalheTipo === "concluidos" ? "Pedidos concluídos" : "Todos os pedidos"} (pedidos, excluindo fictícios)
+              </div>
+              {servicesErro && <div style={{ color: COLORS.red, fontSize: 12 }}>{servicesErro}</div>}
+              {!servicesErro && !servicesDetalhe && <div style={{ color: COLORS.gray500, fontSize: 13 }}>Carregando...</div>}
+              {servicesDetalhe && servicesFiltrados.length === 0 && (
+                <p style={{ color: COLORS.gray400, fontSize: 13, margin: 0 }}>Nada aqui agora.</p>
+              )}
+              {servicesFiltrados.map((s, i) => (
+                <div
+                  key={s.id}
+                  style={{ borderTop: i ? `1px solid ${COLORS.gray100}` : "none", padding: "10px 0", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap", fontSize: 13 }}
+                >
+                  <div>
+                    <div style={{ fontWeight: 700, color: COLORS.gray900 }}>
+                      {s.codigo_interno && <span style={{ color: COLORS.gray400, fontWeight: 800, marginRight: 6 }}>{s.codigo_interno}</span>}
+                      {s.title || "Sem descrição"}
+                    </div>
+                    <div style={{ color: COLORS.gray400, fontSize: 12 }}>{s.client_name || "Sem cliente"} · {s.city || "sem cidade"}</div>
+                  </div>
+                  <div style={{ display: "flex", gap: 14, alignItems: "center" }}>
+                    <span style={{ fontSize: 11, fontWeight: 800, padding: "3px 9px", borderRadius: 999, background: (STATUS_COLORS[s.status] || COLORS.gray400) + "22", color: STATUS_COLORS[s.status] || COLORS.gray500 }}>
+                      {s.status}
+                    </span>
+                    <span style={{ fontWeight: 700 }}>{formatMoney(s.value)}</span>
+                  </div>
+                </div>
+              ))}
+            </Card>
+          )}
 
           {/* Bloco 2 — Dinheiro na Mesa. Texto/valor trocam sozinhos conforme
               o modelo de cobrança ativo (comissao_ativa em config_monetizacao)
               — ver useAlerts.js e /api/admin/oportunidades. Correção do
               modelo financeiro, MULTI-CRM, 2026-09-01: enquanto comissão
               estiver desligada (hoje), isso é mensalidade de profissional
-              pendente, não valor de serviço. */}
-          <Card style={{ background: `linear-gradient(135deg,${COLORS.green},#047857)`, color: "white", marginBottom: 16 }}>
+              pendente, não valor de serviço.
+              Clicável (Fase 1 do diagnóstico) só no modo "mensalidade" — é o
+              modo realmente ativo hoje (comissao_ativa=false) e abre
+              Profissionais filtrado por paymentStatus em ('sem_plano',
+              'sem_confirmacao'), ver /api/admin/professionals. O modo
+              "servico" soma os mesmos três tipos que acabaram de ser
+              ocultados do bloco "Precisa de atenção" por falta de definição
+              de negócio validada — não faz sentido linkar clique num valor
+              que reusa um conceito que a gente mesmo decidiu esconder; fica
+              sem onClick até a Fase 6 resolver isso. */}
+          <Card
+            style={{
+              background: `linear-gradient(135deg,${COLORS.green},#047857)`, color: "white", marginBottom: 16,
+              cursor: alertas.dinheiroNaMesaModo === "mensalidade" ? "pointer" : "default",
+            }}
+            {...(alertas.dinheiroNaMesaModo === "mensalidade" ? { onClick: () => onFilterProfessionals?.("pagamento_pendente"), role: "button", tabIndex: 0 } : {})}
+          >
             <div style={{ fontSize: 12, fontWeight: 700, opacity: 0.85, textTransform: "uppercase" }}>💰 Dinheiro na mesa</div>
             <div style={{ fontSize: 30, fontWeight: 900, marginTop: 4 }}>{formatMoney(alertas.dinheiroNaMesa)}</div>
             <div style={{ fontSize: 12, opacity: 0.85, marginTop: 2 }}>
@@ -93,17 +210,19 @@ export default function Overview({ onSelectClient, onSelectProfessional, onUnaut
             </div>
           </Card>
 
-          {/* Bloco 3 — Precisa de Atenção */}
+          {/* Bloco 3 — Precisa de Atenção. "Sem proposta"/"Proposta sem
+              resposta" saíram deste grid nesta fase (ver
+              TIPOS_OCULTOS_VISAO_GERAL no topo do arquivo). */}
           <div style={{ marginBottom: 20 }}>
             <h2 style={{ fontSize: 15, fontWeight: 800, margin: "0 0 10px", color: COLORS.gray900 }}>⚡ Precisa de atenção</h2>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 12 }}>
-              {alertas.tipos.map((t) => {
+              {tiposVisiveis.map((t) => {
                 const count = alertas.contagem(t.id);
                 const ativo = tipoSelecionado === t.id;
                 return (
                   <button
                     key={t.id}
-                    onClick={() => setTipoSelecionado(ativo ? null : t.id)}
+                    onClick={() => { setPedidosDetalheTipo(null); setTipoSelecionado(ativo ? null : t.id); }}
                     style={{ textAlign: "left", background: "white", border: ativo ? `2px solid ${t.cor}` : `1px solid ${COLORS.gray200}`, borderRadius: 14, padding: 16, cursor: "pointer" }}
                   >
                     <div style={{ fontSize: 12, color: COLORS.gray500, fontWeight: 700, display: "flex", alignItems: "center", gap: 6 }}>

@@ -60,6 +60,10 @@ export default function App() {
   const [selectedProfessionalEmail, setSelectedProfessionalEmail] = useState(null);
   const [globalSearchTerm, setGlobalSearchTerm] = useState("");
   const [searchKey, setSearchKey] = useState(0);
+  // Fase 1 do diagnóstico de estrutura do CRM (2026-09-06) — StatTiles
+  // clicáveis na Visão Geral abrem Profissionais já filtrado (ex: "Receita
+  // recorrente" → pago). Mesmo padrão de globalSearchTerm acima.
+  const [professionalFilterStatus, setProfessionalFilterStatus] = useState("");
 
   const handleUnauthorized = useCallback(() => {
     clearToken();
@@ -86,6 +90,7 @@ export default function App() {
     setScreen(next);
     setSelectedClientEmail(null);
     setSelectedProfessionalEmail(null);
+    setProfessionalFilterStatus(""); // navegação "limpa" pela sidebar não deve herdar filtro de um clique anterior na Visão Geral
   };
 
   const irParaCliente = (email) => {
@@ -95,6 +100,17 @@ export default function App() {
   const irParaProfissional = (email) => {
     setScreen("profissionais");
     setSelectedProfessionalEmail(email);
+  };
+
+  // Fase 1 do diagnóstico de estrutura do CRM (2026-09-06) — StatTile/card da
+  // Visão Geral clicado abre Profissionais já filtrado por paymentStatus
+  // ("pago" = Receita recorrente, "pagamento_pendente" = Dinheiro na mesa em
+  // modo mensalidade). Mesma tela/endpoint de sempre, só chega com o filtro
+  // já aplicado.
+  const irParaProfissionaisComFiltro = (status) => {
+    setScreen("profissionais");
+    setSelectedProfessionalEmail(null);
+    setProfessionalFilterStatus(status);
   };
 
   // Busca global (header) — Clientes/Profissionais é o que tem dado real
@@ -124,7 +140,15 @@ export default function App() {
       onGlobalSearch={handleGlobalSearch}
       onUnauthorized={handleUnauthorized}
     >
-      {screen === "visao-geral" && <Overview onSelectClient={irParaCliente} onSelectProfessional={irParaProfissional} onUnauthorized={handleUnauthorized} />}
+      {screen === "visao-geral" && (
+        <Overview
+          onSelectClient={irParaCliente}
+          onSelectProfessional={irParaProfissional}
+          onUnauthorized={handleUnauthorized}
+          onNavigate={handleNavigate}
+          onFilterProfessionals={irParaProfissionaisComFiltro}
+        />
+      )}
 
       {screen === "inbox" && <Inbox onUnauthorized={handleUnauthorized} />}
 
@@ -157,7 +181,7 @@ export default function App() {
             onUnauthorized={handleUnauthorized}
           />
         ) : (
-          <ProfessionalList onSelectProfessional={setSelectedProfessionalEmail} onUnauthorized={handleUnauthorized} />
+          <ProfessionalList onSelectProfessional={setSelectedProfessionalEmail} onUnauthorized={handleUnauthorized} initialFiltroStatus={professionalFilterStatus} />
         ))}
 
       {screen === "administrativo" && <AdminHome onNavigate={setScreen} />}

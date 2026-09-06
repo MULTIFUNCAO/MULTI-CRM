@@ -55,11 +55,18 @@ function CicloBadge({ ciclo }) {
 // Fase 3 — mesmo padrão visual/estrutural de ClientList.jsx. Filtros de
 // cidade/categoria/status batem no backend (GET /api/admin/professionals
 // com query params); busca por texto continua no cliente.
-export default function ProfessionalList({ onSelectProfessional, onUnauthorized }) {
+//
+// initialFiltroStatus (Fase 1 do diagnóstico de estrutura do CRM,
+// 2026-09-06): mesmo padrão de "initialBusca" em ClientList.jsx — permite a
+// Visão Geral abrir esta tela já filtrada ao clicar num StatTile (ex:
+// "Receita recorrente" → status=pago). Quem chama precisa trocar a `key` do
+// componente (ver App.jsx) pra esse valor inicial ser respeitado de novo em
+// cliques seguidos com status diferente.
+export default function ProfessionalList({ onSelectProfessional, onUnauthorized, initialFiltroStatus }) {
   const [profissionais, setProfissionais] = useState(null);
   const [error, setError] = useState("");
   const [busca, setBusca] = useState("");
-  const [filtroStatus, setFiltroStatus] = useState("");
+  const [filtroStatus, setFiltroStatus] = useState(initialFiltroStatus || "");
   const [filtroCidade, setFiltroCidade] = useState("");
   const [filtroCategoria, setFiltroCategoria] = useState("");
   const [opcoes, setOpcoes] = useState({ cidades: [], categorias: [] });
@@ -129,6 +136,11 @@ export default function ProfessionalList({ onSelectProfessional, onUnauthorized 
           <option value="approved">Aprovado</option>
           <option value="pendente">Pendente</option>
           <option value="role_divergente">Divergência de role (debug)</option>
+          {/* "pago"/"pagamento_pendente" são sobre PAGAMENTO, eixo diferente
+              de aprovado/pendente acima (que é sobre aprovação de cadastro)
+              — ver comentário em GET /api/admin/professionals. */}
+          <option value="pago">Pagamento confirmado</option>
+          <option value="pagamento_pendente">Pagamento pendente</option>
         </select>
       </div>
 

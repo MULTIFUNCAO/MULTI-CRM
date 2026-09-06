@@ -7,6 +7,8 @@
 // arriscar quebrar o que já está testado e no ar. Consolidar todo o app
 // nesse kit é trabalho de limpeza pra uma fase futura, não desta.
 
+import { useState } from "react";
+
 export const COLORS = {
   blue: "#0066FF",
   blueDark: "#0055d4",
@@ -40,17 +42,46 @@ export function PageHeader({ title, subtitle, actions }) {
   );
 }
 
-export function Card({ children, style }) {
+// Fase 1 do diagnóstico de estrutura do CRM (2026-09-06): passa adiante
+// qualquer outro prop (onClick, role, tabIndex, onKeyDown...) pro <div> —
+// precisava disso pro card "Dinheiro na mesa" (Overview.jsx) virar clicável
+// sem reinventar o componente. Nenhum uso existente de <Card> passava outro
+// prop além de style/children, então isso não muda nada pro resto do app.
+export function Card({ children, style, ...rest }) {
   return (
-    <div style={{ background: "white", border: `1px solid ${COLORS.gray200}`, borderRadius: 16, padding: 20, ...style }}>
+    <div style={{ background: "white", border: `1px solid ${COLORS.gray200}`, borderRadius: 16, padding: 20, ...style }} {...rest}>
       {children}
     </div>
   );
 }
 
-export function StatTile({ label, value, icon, sub }) {
+// Fase 1 do diagnóstico de estrutura do CRM (2026-09-06): onClick opcional —
+// quando presente, o tile vira botão (foco/teclado incluídos) e ganha um
+// affordance visual simples (cursor + hover), pra abrir a lista filtrada que
+// originou o número. Sem onClick, comportamento idêntico a antes (nem todo
+// StatTile tem pra onde navegar ainda).
+export function StatTile({ label, value, icon, sub, onClick }) {
+  const [hover, setHover] = useState(false);
+  const clicavel = typeof onClick === "function";
   return (
-    <Card style={{ padding: 18, flex: "1 1 180px" }}>
+    <Card
+      style={{
+        padding: 18,
+        flex: "1 1 180px",
+        cursor: clicavel ? "pointer" : "default",
+        borderColor: clicavel && hover ? COLORS.blue : COLORS.gray200,
+      }}
+      {...(clicavel
+        ? {
+            role: "button",
+            tabIndex: 0,
+            onClick,
+            onKeyDown: (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onClick(e); } },
+            onMouseEnter: () => setHover(true),
+            onMouseLeave: () => setHover(false),
+          }
+        : {})}
+    >
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
         {icon && <span style={{ fontSize: 16 }}>{icon}</span>}
         <span style={{ fontSize: 12, color: COLORS.gray500, fontWeight: 700, textTransform: "uppercase" }}>{label}</span>
