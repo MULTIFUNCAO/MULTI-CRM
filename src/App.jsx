@@ -150,7 +150,7 @@ export default function App() {
         />
       )}
 
-      {screen === "inbox" && <Inbox onUnauthorized={handleUnauthorized} />}
+      {screen === "inbox" && <Inbox onUnauthorized={handleUnauthorized} onNavigate={handleNavigate} />}
 
       {screen === "vendas" && <Vendas onUnauthorized={handleUnauthorized} />}
 

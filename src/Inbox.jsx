@@ -1,24 +1,36 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { adminFetch } from "./api";
-import { PageHeader, Card, Badge, EmptyState, COLORS } from "./ui";
+import { PageHeader, Card, Badge, StatTile, EmptyState, COLORS } from "./ui";
 
-// Handoff MULTI-CRM 2026-09-02, item 2 (Caixa de Entrada). Duas abas: Suporte
-// (real, dado real) e WhatsApp — 2026-09-03: sai do "ainda travado" (motivo
-// abaixo era o texto original, ver App.jsx/EM_CONSTRUCAO.inbox antigo).
-// Provedor Z-API (QR code, sem aprovação Meta) — decisão do usuário pra MVP,
-// ver handoff. Consome MULTI-BACKEND /api/admin/whatsapp/*.
+// Handoff MULTI-CRM 2026-09-02, item 2 (Caixa de Entrada). Reorganizada na
+// Fase 2 do diagnóstico de estrutura do CRM (2026-09-06), "Caixa de Entrada
+// como Triagem": deixa de parecer só "Suporte" e vira a central de triagem
+// da MULTI — toda conversa do WhatsApp nasce aqui e é roteada pra Vendas,
+// Suporte ou Serviços (Atendimentos.jsx). A integração Z-API (WhatsApp,
+// componente abaixo) não muda de comportamento nenhum — só ganhou 2 pontas
+// novas (fila='triagem' no menu, prop abrirTelefone) — e continua exportada
+// pra Vendas.jsx reaproveitar (filaFiltro="vendas"), como já era.
+//
+// "Tickets" (problema interno COM UM PROFISSIONAL — pagamento, documento,
+// reclamação) é conceito diferente de "Suporte" na Triagem (conversa DE
+// CLIENTE roteada pro time) — achado do diagnóstico desta fase: são 2
+// modelos de "suporte" que não se sobrepõem (público diferente), por isso
+// continuam como abas separadas aqui, nenhum dado migrado entre eles (ver
+// memória do projeto — os dois tinham 0 linhas reais até esta fase).
 
-const PRIORIDADE_TONE = { baixa: "gray", normal: "blue", alta: "red" };
-const STATUS_TONE = { aberto: "red", em_andamento: "amber", resolvido: "green" };
-const STATUS_LABEL = { aberto: "Aberto", em_andamento: "Em andamento", resolvido: "Resolvido" };
+const TICKET_STATUS_TONE = { aberto: "red", em_andamento: "amber", resolvido: "green" };
+const TICKET_STATUS_LABEL = { aberto: "Aberto", em_andamento: "Em andamento", resolvido: "Resolvido" };
 
 function Tabs({ active, onChange }) {
   const tabs = [
-    { id: "suporte", label: "Suporte" },
     { id: "whatsapp", label: "WhatsApp" },
+    { id: "triagem", label: "Triagem" },
+    { id: "encaminhadas", label: "Encaminhadas" },
+    { id: "acompanhamento", label: "Acompanhamento" },
+    { id: "tickets", label: "Tickets (profissional)" },
   ];
   return (
-    <div style={{ display: "flex", gap: 4, marginBottom: 18, borderBottom: `1px solid ${COLORS.gray200}` }}>
+    <div style={{ display: "flex", gap: 4, marginBottom: 18, borderBottom: `1px solid ${COLORS.gray200}`, flexWrap: "wrap" }}>
       {tabs.map(t => (
         <button
           key={t.id}
@@ -33,11 +45,298 @@ function Tabs({ active, onChange }) {
             fontSize: 13,
             cursor: "pointer",
             marginBottom: -1,
+            whiteSpace: "nowrap",
           }}
         >
           {t.label}
         </button>
       ))}
+    </div>
+  );
+}
+
+function Pills({ options, active, onChange }) {
+  return (
+    <div style={{ display: "flex", gap: 6, marginBottom: 14, flexWrap: "wrap" }}>
+      {options.map(o => (
+        <button
+          key={o.id}
+          onClick={() => onChange(o.id)}
+          style={{
+            padding: "6px 12px", borderRadius: 999,
+            border: `1px solid ${active === o.id ? COLORS.blue : COLORS.gray200}`,
+            background: active === o.id ? COLORS.blue : "white",
+            color: active === o.id ? "white" : COLORS.gray700,
+            fontWeight: 700, fontSize: 12, cursor: "pointer",
+          }}
+        >
+          {o.label} ({o.count})
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// ── MÉTRICAS DE TRIAGEM (item 4 da Fase 2) ──────────────────────────────
+// Painel simples dentro da própria tela — ver origem de cada número em
+// GET /api/admin/triagem-metricas (server.js). Sempre visível, não muda
+// com a aba selecionada.
+function MetricasTriagem({ onUnauthorized, versao }) {
+  const [m, setM] = useState(null);
+  const [erro, setErro] = useState("");
+
+  useEffect(() => {
+    adminFetch("/api/admin/triagem-metricas")
+      .then(d => { setM(d); setErro(""); })
+      .catch(e => { if (e.unauthorized) return onUnauthorized?.(); setErro(e.message); });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [versao]);
+
+  if (erro) return <div style={{ background: COLORS.redBg, color: COLORS.red, padding: 12, borderRadius: 10, marginBottom: 16, fontSize: 13 }}>{erro}</div>;
+  if (!m) return null;
+
+  return (
+    <div style={{ marginBottom: 20 }}>
+      <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 8 }}>
+        <StatTile label="Leads hoje" value={m.leadsRecebidosHoje} icon="📥" />
+        <StatTile label="Triados hoje" value={m.leadsTriadosHoje} icon="🔎" />
+        <StatTile label="Ainda não triados" value={m.leadsNaoTriados} icon="⏳" />
+        <StatTile label="Pendentes (encaminhados)" value={m.pendentes} icon="📌" />
+      </div>
+      <div style={{ fontSize: 12, color: COLORS.gray500 }}>
+        Enviados hoje: <strong>{m.enviadosHoje.vendas}</strong> vendas · <strong>{m.enviadosHoje.suporte}</strong> suporte · <strong>{m.enviadosHoje.servicos}</strong> serviços
+      </div>
+    </div>
+  );
+}
+
+// ── Card genérico de uma linha de demandas_clientes (Fase 2) ────────────
+// "acoes" vem pronto de quem chama — cada aba decide o que faz sentido
+// oferecer pra cada balde (Triagem/Encaminhadas/Acompanhamento).
+function DemandaCard({ demanda, acoes, onVerConversa }) {
+  return (
+    <Card style={{ marginBottom: 10 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, flexWrap: "wrap" }}>
+        <div style={{ flex: 1, minWidth: 220 }}>
+          <div style={{ fontWeight: 800, fontSize: 14 }}>
+            {demanda.nome_cliente || formatarTelefone(demanda.telefone_cliente) || "Sem nome"}
+          </div>
+          <div style={{ fontSize: 12, color: COLORS.gray500, marginTop: 2 }}>
+            {demanda.telefone_cliente && formatarTelefone(demanda.telefone_cliente)}
+            {demanda.regiao && ` · ${demanda.regiao}`}
+            {demanda.categoria_servico && ` · ${demanda.categoria_servico}`}
+          </div>
+          {demanda.descricao && <div style={{ fontSize: 13, color: COLORS.gray700, marginTop: 8 }}>{demanda.descricao}</div>}
+          <div style={{ fontSize: 11, color: COLORS.gray400, marginTop: 8 }}>
+            Aberta {new Date(demanda.criado_em).toLocaleString("pt-BR")}
+            {demanda.atualizado_em !== demanda.criado_em && ` · atualizada ${new Date(demanda.atualizado_em).toLocaleString("pt-BR")}`}
+          </div>
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 6, alignItems: "flex-end" }}>
+          {demanda.telefone_cliente && (
+            <button onClick={() => onVerConversa(demanda.telefone_cliente)} style={{ background: "none", border: `1px solid ${COLORS.gray200}`, borderRadius: 8, padding: "6px 12px", fontWeight: 700, fontSize: 12, color: COLORS.gray700, cursor: "pointer", whiteSpace: "nowrap" }}>
+              Ver conversa
+            </button>
+          )}
+          {acoes.map((a, i) => (
+            <button
+              key={i}
+              onClick={a.onClick}
+              style={{
+                background: a.tone === "green" ? COLORS.greenBg : a.tone === "red" ? COLORS.redBg : COLORS.amberBg,
+                color: a.tone === "green" ? COLORS.green : a.tone === "red" ? COLORS.red : COLORS.amber,
+                border: "none", borderRadius: 8, padding: "6px 12px", fontWeight: 800, fontSize: 12, cursor: "pointer", whiteSpace: "nowrap",
+              }}
+            >
+              {a.label}
+            </button>
+          ))}
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+// ── Aba "Triagem" — Novas / Em triagem / Retornaram para triagem ────────
+function AbaTriagem({ demandas, conversasNovas, erroNovas, onUnauthorized, onVerConversa, onMudou, onAbrirEncaminharModal }) {
+  const emTriagem = useMemo(() => demandas.filter(d => d.fila === "triagem" && d.atualizado_em === d.criado_em), [demandas]);
+  const retornaram = useMemo(() => demandas.filter(d => d.fila === "triagem" && d.atualizado_em !== d.criado_em), [demandas]);
+  const [sub, setSub] = useState("novas");
+
+  const patch = async (id, body) => {
+    try {
+      await adminFetch(`/api/admin/demandas/${id}`, { method: "PATCH", body: JSON.stringify(body) });
+      onMudou();
+    } catch (e) { if (e.unauthorized) return onUnauthorized?.(); }
+  };
+
+  const abrirParaTriagem = async (conversa) => {
+    try {
+      await adminFetch("/api/admin/demandas", {
+        method: "POST",
+        body: JSON.stringify({ telefoneCliente: conversa.telefone, fila: "triagem", nomeCliente: conversa.nomeContato || null, descricao: conversa.ultimaMensagem || null }),
+      });
+      onMudou();
+    } catch (e) { if (e.unauthorized) return onUnauthorized?.(); }
+  };
+
+  const acoesEncaminhar = (d) => ([
+    { label: "→ Vendas", tone: "amber", onClick: () => patch(d.id, { fila: "vendas" }) },
+    { label: "→ Suporte", tone: "amber", onClick: () => patch(d.id, { fila: "suporte" }) },
+    { label: "→ Serviços", tone: "amber", onClick: () => patch(d.id, { fila: "demanda" }) },
+    { label: "Finalizar", tone: "green", onClick: () => patch(d.id, { status: "resolvida" }) },
+  ]);
+
+  return (
+    <div>
+      <Pills
+        options={[
+          { id: "novas", label: "Novas", count: conversasNovas === null ? "…" : conversasNovas.length },
+          { id: "em_triagem", label: "Em triagem", count: emTriagem.length },
+          { id: "retornaram", label: "Retornaram para triagem", count: retornaram.length },
+        ]}
+        active={sub}
+        onChange={setSub}
+      />
+
+      {sub === "novas" && (
+        erroNovas ? <div style={{ color: COLORS.red, fontSize: 13 }}>{erroNovas}</div> :
+        conversasNovas === null ? <div style={{ padding: 40, textAlign: "center", color: COLORS.gray500 }}>Carregando...</div> :
+        conversasNovas.length === 0 ? <Card><EmptyState title="Nenhuma conversa nova" description="Todo mundo que já mandou mensagem foi ao menos aberto pra triagem." /></Card> :
+        conversasNovas.map(c => (
+          <Card key={c.telefone} style={{ marginBottom: 10 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, flexWrap: "wrap" }}>
+              <div style={{ flex: 1, minWidth: 220 }}>
+                <div style={{ fontWeight: 800, fontSize: 14 }}>{c.nomeContato || formatarTelefone(c.telefone)}</div>
+                <div style={{ fontSize: 12, color: COLORS.gray500, marginTop: 2 }}>{formatarTelefone(c.telefone)}</div>
+                <div style={{ fontSize: 13, color: COLORS.gray700, marginTop: 8 }}>{c.ultimaMensagem}</div>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6, alignItems: "flex-end" }}>
+                <button onClick={() => onVerConversa(c.telefone)} style={{ background: "none", border: `1px solid ${COLORS.gray200}`, borderRadius: 8, padding: "6px 12px", fontWeight: 700, fontSize: 12, color: COLORS.gray700, cursor: "pointer" }}>Ver conversa</button>
+                <button onClick={() => abrirParaTriagem(c)} style={{ background: COLORS.amberBg, color: COLORS.amber, border: "none", borderRadius: 8, padding: "6px 12px", fontWeight: 800, fontSize: 12, cursor: "pointer" }}>Abrir para triagem</button>
+                <button onClick={() => onAbrirEncaminharModal(c.telefone, c.ultimaMensagem)} style={{ background: COLORS.gray100, color: COLORS.gray700, border: "none", borderRadius: 8, padding: "6px 12px", fontWeight: 800, fontSize: 12, cursor: "pointer" }}>Encaminhar direto ▾</button>
+              </div>
+            </div>
+          </Card>
+        ))
+      )}
+
+      {sub === "em_triagem" && (
+        emTriagem.length === 0 ? <Card><EmptyState title="Nada em triagem" description="Nenhuma conversa aberta pra decidir destino agora." /></Card> :
+        emTriagem.map(d => <DemandaCard key={d.id} demanda={d} onVerConversa={onVerConversa} acoes={acoesEncaminhar(d)} />)
+      )}
+
+      {sub === "retornaram" && (
+        retornaram.length === 0 ? <Card><EmptyState title="Nada retornou" description="Nenhuma conversa encaminhada voltou pra triagem." /></Card> :
+        retornaram.map(d => <DemandaCard key={d.id} demanda={d} onVerConversa={onVerConversa} acoes={acoesEncaminhar(d)} />)
+      )}
+    </div>
+  );
+}
+
+// ── Aba "Encaminhadas" — Vendas / Suporte / Serviços ─────────────────────
+// "Serviços" (fila='demanda') é só visibilidade aqui — a gestão de status
+// já existe em Atendimentos.jsx (Fase 3 da especificação original) e
+// continua lá, sem duplicar; por isso o card de Serviços só linka pra lá em
+// vez de oferecer Assumir/Finalizar direto (evita 2 telas divergindo sobre
+// o mesmo registro).
+function AbaEncaminhadas({ demandas, onUnauthorized, onVerConversa, onMudou, onNavigate }) {
+  const [sub, setSub] = useState("vendas");
+  const vendas = useMemo(() => demandas.filter(d => d.fila === "vendas" && d.status === "aberta"), [demandas]);
+  const suporte = useMemo(() => demandas.filter(d => d.fila === "suporte" && d.status === "aberta"), [demandas]);
+  const servicos = useMemo(() => demandas.filter(d => d.fila === "demanda" && d.status === "aberta"), [demandas]);
+
+  const patch = async (id, body) => {
+    try {
+      await adminFetch(`/api/admin/demandas/${id}`, { method: "PATCH", body: JSON.stringify(body) });
+      onMudou();
+    } catch (e) { if (e.unauthorized) return onUnauthorized?.(); }
+  };
+
+  const acoesFila = (d) => ([
+    { label: "Assumir", tone: "amber", onClick: () => patch(d.id, { assumir: true }) },
+    { label: "Aguardando resposta", tone: "amber", onClick: () => patch(d.id, { status: "aguardando_resposta" }) },
+    { label: "Finalizar", tone: "green", onClick: () => patch(d.id, { status: "resolvida" }) },
+    { label: "Voltar p/ triagem", tone: "red", onClick: () => patch(d.id, { fila: "triagem" }) },
+  ]);
+
+  const lista = sub === "vendas" ? vendas : sub === "suporte" ? suporte : servicos;
+
+  return (
+    <div>
+      <Pills
+        options={[
+          { id: "vendas", label: "Vendas", count: vendas.length },
+          { id: "suporte", label: "Suporte", count: suporte.length },
+          { id: "servicos", label: "Serviços", count: servicos.length },
+        ]}
+        active={sub}
+        onChange={setSub}
+      />
+      {sub === "servicos" && (
+        <div style={{ fontSize: 12, color: COLORS.gray500, marginBottom: 10 }}>
+          Gerenciado na aba <button onClick={() => onNavigate?.("atendimentos")} style={{ background: "none", border: "none", color: COLORS.blue, fontWeight: 800, cursor: "pointer", padding: 0, fontSize: 12 }}>Atendimentos</button> — aqui é só visibilidade de quem chegou pela Triagem.
+        </div>
+      )}
+      {lista.length === 0 ? (
+        <Card><EmptyState title="Nada por aqui" description="Ninguém encaminhado pra essa fila agora." /></Card>
+      ) : (
+        lista.map(d => (
+          <DemandaCard
+            key={d.id}
+            demanda={d}
+            onVerConversa={onVerConversa}
+            acoes={sub === "servicos" ? [{ label: "Ver em Atendimentos", tone: "amber", onClick: () => onNavigate?.("atendimentos") }] : acoesFila(d)}
+          />
+        ))
+      )}
+    </div>
+  );
+}
+
+// ── Aba "Acompanhamento" — Em andamento / Aguardando resposta / Finalizadas
+function AbaAcompanhamento({ demandas, onUnauthorized, onVerConversa, onMudou, onNavigate }) {
+  const [sub, setSub] = useState("em_andamento");
+  const emAndamento = useMemo(() => demandas.filter(d => d.fila !== "triagem" && d.status === "em_andamento"), [demandas]);
+  const aguardando = useMemo(() => demandas.filter(d => d.fila !== "triagem" && d.status === "aguardando_resposta"), [demandas]);
+  const finalizadas = useMemo(() => demandas.filter(d => d.status === "resolvida" || d.status === "cancelada"), [demandas]);
+
+  const patch = async (id, body) => {
+    try {
+      await adminFetch(`/api/admin/demandas/${id}`, { method: "PATCH", body: JSON.stringify(body) });
+      onMudou();
+    } catch (e) { if (e.unauthorized) return onUnauthorized?.(); }
+  };
+
+  const acoesPara = (d) => {
+    if (d.fila === "demanda") return [{ label: "Ver em Atendimentos", tone: "amber", onClick: () => onNavigate?.("atendimentos") }];
+    const base = [];
+    if (d.status !== "em_andamento") base.push({ label: "Retomar", tone: "amber", onClick: () => patch(d.id, { status: "em_andamento" }) });
+    if (d.status !== "aguardando_resposta") base.push({ label: "Aguardando resposta", tone: "amber", onClick: () => patch(d.id, { status: "aguardando_resposta" }) });
+    if (d.status !== "resolvida") base.push({ label: "Finalizar", tone: "green", onClick: () => patch(d.id, { status: "resolvida" }) });
+    if (d.status === "resolvida" || d.status === "cancelada") base.push({ label: "Reabrir", tone: "amber", onClick: () => patch(d.id, { status: "aberta" }) });
+    base.push({ label: "Voltar p/ triagem", tone: "red", onClick: () => patch(d.id, { fila: "triagem" }) });
+    return base;
+  };
+
+  const lista = sub === "em_andamento" ? emAndamento : sub === "aguardando" ? aguardando : finalizadas;
+
+  return (
+    <div>
+      <Pills
+        options={[
+          { id: "em_andamento", label: "Em andamento", count: emAndamento.length },
+          { id: "aguardando", label: "Aguardando resposta", count: aguardando.length },
+          { id: "finalizadas", label: "Finalizadas", count: finalizadas.length },
+        ]}
+        active={sub}
+        onChange={setSub}
+      />
+      {lista.length === 0 ? (
+        <Card><EmptyState title="Nada por aqui" description="Nenhum item nessa situação agora." /></Card>
+      ) : (
+        lista.map(d => <DemandaCard key={d.id} demanda={d} onVerConversa={onVerConversa} acoes={sub === "finalizadas" ? (d.fila === "demanda" ? [{ label: "Ver em Atendimentos", tone: "amber", onClick: () => onNavigate?.("atendimentos") }] : [{ label: "Reabrir", tone: "amber", onClick: () => patch(d.id, { status: "aberta" }) }]) : acoesPara(d)} />)
+      )}
     </div>
   );
 }
@@ -124,7 +423,7 @@ function TicketCard({ ticket, onAssumir, onResolver }) {
         <div style={{ flex: 1, minWidth: 200 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 4 }}>
             <span style={{ fontWeight: 800, fontSize: 14 }}>{ticket.assunto}</span>
-            <Badge tone={STATUS_TONE[ticket.status]}>{STATUS_LABEL[ticket.status]}</Badge>
+            <Badge tone={TICKET_STATUS_TONE[ticket.status]}>{TICKET_STATUS_LABEL[ticket.status]}</Badge>
             <Badge tone={PRIORIDADE_TONE[ticket.prioridade]}>{ticket.prioridade}</Badge>
           </div>
           <div style={{ fontSize: 12, color: COLORS.gray500 }}>
@@ -178,8 +477,14 @@ function TicketCard({ ticket, onAssumir, onResolver }) {
   );
 }
 
-function Suporte({ onUnauthorized }) {
-  const [aba, setAba] = useState("tickets");
+const PRIORIDADE_TONE = { baixa: "gray", normal: "blue", alta: "red" };
+
+// "Tickets (profissional)" — módulo de Suporte original (problema interno
+// com um profissional), intocado nesta fase — só saiu de dentro da antiga
+// aba "Suporte" (que também tinha uma sub-aba WhatsApp) pra virar uma aba
+// própria no nível principal, já que não é mais a mesma coisa que a
+// Triagem de conversa de cliente.
+function Tickets({ onUnauthorized }) {
   const [tickets, setTickets] = useState(null);
   const [filtro, setFiltro] = useState("todos");
   const [mostrarForm, setMostrarForm] = useState(false);
@@ -208,81 +513,54 @@ function Suporte({ onUnauthorized }) {
 
   return (
     <div>
-      {/* Sub-abas — "WhatsApp" reaproveita o componente de cima filtrado por
-          fila='suporte' (especificação "Fila de Demandas de Clientes",
-          2026-09-03): conversas movidas pra cá na aba WhatsApp da Caixa de
-          Entrada. "Tickets" é o módulo de Suporte original, intocado. */}
-      <div style={{ display: "flex", gap: 4, marginBottom: 18, borderBottom: `1px solid ${COLORS.gray200}` }}>
-        {[{ id: "tickets", label: "Tickets" }, { id: "whatsapp", label: "WhatsApp" }].map(t => (
-          <button
-            key={t.id}
-            onClick={() => setAba(t.id)}
-            style={{
-              padding: "10px 16px", border: "none", background: "none",
-              borderBottom: aba === t.id ? `2px solid ${COLORS.blue}` : "2px solid transparent",
-              color: aba === t.id ? COLORS.blue : COLORS.gray500,
-              fontWeight: 800, fontSize: 13, cursor: "pointer", marginBottom: -1,
-            }}
-          >
-            {t.label}
-          </button>
-        ))}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14, flexWrap: "wrap", gap: 10 }}>
+        <div style={{ display: "flex", gap: 6 }}>
+          {["todos", "aberto", "em_andamento", "resolvido"].map(s => (
+            <button
+              key={s}
+              onClick={() => setFiltro(s)}
+              style={{
+                padding: "6px 12px",
+                borderRadius: 999,
+                border: `1px solid ${filtro === s ? COLORS.blue : COLORS.gray200}`,
+                background: filtro === s ? COLORS.blue : "white",
+                color: filtro === s ? "white" : COLORS.gray700,
+                fontWeight: 700,
+                fontSize: 12,
+                cursor: "pointer",
+              }}
+            >
+              {s === "todos" ? "Todos" : TICKET_STATUS_LABEL[s]} ({contagem(s)})
+            </button>
+          ))}
+        </div>
+        <button onClick={() => setMostrarForm(v => !v)} style={{ background: COLORS.blue, color: "white", border: "none", borderRadius: 8, padding: "8px 16px", fontWeight: 800, fontSize: 13, cursor: "pointer" }}>
+          {mostrarForm ? "Fechar" : "+ Novo ticket"}
+        </button>
       </div>
 
-      {aba === "whatsapp" && <WhatsApp onUnauthorized={onUnauthorized} filaFiltro="suporte" />}
+      {error && <div style={{ background: COLORS.redBg, color: COLORS.red, padding: 12, borderRadius: 10, marginBottom: 14, fontSize: 13 }}>{error}</div>}
 
-      {aba === "tickets" && (
-        <>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14, flexWrap: "wrap", gap: 10 }}>
-            <div style={{ display: "flex", gap: 6 }}>
-              {["todos", "aberto", "em_andamento", "resolvido"].map(s => (
-                <button
-                  key={s}
-                  onClick={() => setFiltro(s)}
-                  style={{
-                    padding: "6px 12px",
-                    borderRadius: 999,
-                    border: `1px solid ${filtro === s ? COLORS.blue : COLORS.gray200}`,
-                    background: filtro === s ? COLORS.blue : "white",
-                    color: filtro === s ? "white" : COLORS.gray700,
-                    fontWeight: 700,
-                    fontSize: 12,
-                    cursor: "pointer",
-                  }}
-                >
-                  {s === "todos" ? "Todos" : STATUS_LABEL[s]} ({contagem(s)})
-                </button>
-              ))}
-            </div>
-            <button onClick={() => setMostrarForm(v => !v)} style={{ background: COLORS.blue, color: "white", border: "none", borderRadius: 8, padding: "8px 16px", fontWeight: 800, fontSize: 13, cursor: "pointer" }}>
-              {mostrarForm ? "Fechar" : "+ Novo ticket"}
-            </button>
-          </div>
+      {mostrarForm && (
+        <NovoTicketForm
+          onCreated={() => { setMostrarForm(false); carregar(); }}
+          onCancel={() => setMostrarForm(false)}
+        />
+      )}
 
-          {error && <div style={{ background: COLORS.redBg, color: COLORS.red, padding: 12, borderRadius: 10, marginBottom: 14, fontSize: 13 }}>{error}</div>}
-
-          {mostrarForm && (
-            <NovoTicketForm
-              onCreated={() => { setMostrarForm(false); carregar(); }}
-              onCancel={() => setMostrarForm(false)}
-            />
-          )}
-
-          {tickets === null ? (
-            <div style={{ padding: 40, textAlign: "center", color: COLORS.gray500 }}>Carregando...</div>
-          ) : filtrados.length === 0 ? (
-            <Card><EmptyState title="Nenhum ticket" description={filtro === "todos" ? "Nenhum ticket de suporte aberto ainda." : `Nenhum ticket com status "${STATUS_LABEL[filtro] || filtro}".`} /></Card>
-          ) : (
-            filtrados.map(t => (
-              <TicketCard
-                key={t.id}
-                ticket={t}
-                onAssumir={(id) => acao(id, { assumir: true })}
-                onResolver={(id, nota) => acao(id, { status: "resolvido", resolucaoNota: nota })}
-              />
-            ))
-          )}
-        </>
+      {tickets === null ? (
+        <div style={{ padding: 40, textAlign: "center", color: COLORS.gray500 }}>Carregando...</div>
+      ) : filtrados.length === 0 ? (
+        <Card><EmptyState title="Nenhum ticket" description={filtro === "todos" ? "Nenhum ticket de suporte aberto ainda." : `Nenhum ticket com status "${TICKET_STATUS_LABEL[filtro] || filtro}".`} /></Card>
+      ) : (
+        filtrados.map(t => (
+          <TicketCard
+            key={t.id}
+            ticket={t}
+            onAssumir={(id) => acao(id, { assumir: true })}
+            onResolver={(id, nota) => acao(id, { status: "resolvido", resolucaoNota: nota })}
+          />
+        ))
       )}
     </div>
   );
@@ -374,13 +652,17 @@ function Bolha({ mensagem }) {
 // chat. Sem realtime de verdade (sem websocket/Supabase Realtime plugado
 // aqui) — poll simples a cada 10s só na conversa aberta, pra não passar a
 // impressão de "ao vivo" quando não é.
-// filaFiltro opcional ('vendas' | 'suporte' | 'demanda') — quando presente,
-// só lista conversas já triadas pra essa fila (ver "Mover para fila" acima e
-// GET /api/admin/whatsapp/conversas?fila= no backend). Sem o parâmetro
-// (aba WhatsApp da Caixa de Entrada), lista todas — é onde a triagem inicial
-// acontece. Exportado pra Vendas.jsx e pro sub-tab de Suporte reaproveitarem
-// em vez de duplicar a tela inteira.
-export function WhatsApp({ onUnauthorized, filaFiltro }) {
+// filaFiltro opcional ('vendas' | 'suporte' | 'demanda' | 'triagem' |
+// 'novas') — quando presente, só lista conversas já triadas pra essa fila
+// (ver "Mover para fila" acima e GET /api/admin/whatsapp/conversas?fila=
+// no backend). Sem o parâmetro (aba WhatsApp da Caixa de Entrada), lista
+// todas. Exportado pra Vendas.jsx reaproveitar (comportamento intocado
+// nesta fase — só ganhou o prop abrirTelefone, aditivo).
+// abrirTelefone (Fase 2 do diagnóstico de estrutura do CRM, 2026-09-06):
+// quando presente, abre essa conversa automaticamente ao montar — é como as
+// abas Triagem/Encaminhadas/Acompanhamento levam pro histórico completo sem
+// duplicar a UI de chat.
+export function WhatsApp({ onUnauthorized, filaFiltro, abrirTelefone }) {
   const [conversas, setConversas] = useState(null);
   const [erroConversas, setErroConversas] = useState("");
   const [ativa, setAtiva] = useState(null); // telefone selecionado
@@ -407,6 +689,11 @@ export function WhatsApp({ onUnauthorized, filaFiltro }) {
   };
 
   useEffect(carregarConversas, [filaFiltro]);
+
+  useEffect(() => {
+    if (abrirTelefone) setAtiva(abrirTelefone);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [abrirTelefone]);
 
   useEffect(() => {
     if (!ativa) return;
@@ -487,8 +774,8 @@ export function WhatsApp({ onUnauthorized, filaFiltro }) {
                   Mover para fila ▾
                 </button>
                 {menuFila && (
-                  <div style={{ position: "absolute", top: "100%", right: 0, marginTop: 4, background: "white", border: `1px solid ${COLORS.gray200}`, borderRadius: 10, boxShadow: "0 4px 16px rgba(0,0,0,.1)", zIndex: 10, overflow: "hidden", minWidth: 140 }}>
-                    {[{ id: "demanda", label: "Demanda" }, { id: "vendas", label: "Vendas" }, { id: "suporte", label: "Suporte" }].map(f => (
+                  <div style={{ position: "absolute", top: "100%", right: 0, marginTop: 4, background: "white", border: `1px solid ${COLORS.gray200}`, borderRadius: 10, boxShadow: "0 4px 16px rgba(0,0,0,.1)", zIndex: 10, overflow: "hidden", minWidth: 160 }}>
+                    {[{ id: "triagem", label: "Marcar em triagem" }, { id: "demanda", label: "Serviços" }, { id: "vendas", label: "Vendas" }, { id: "suporte", label: "Suporte" }].map(f => (
                       <button
                         key={f.id}
                         onClick={() => { setMenuFila(false); setModalFila({ fila: f.id }); }}
@@ -551,7 +838,7 @@ export function WhatsApp({ onUnauthorized, filaFiltro }) {
   );
 }
 
-const FILA_LABEL = { demanda: "Demanda", vendas: "Vendas", suporte: "Suporte" };
+const FILA_LABEL = { triagem: "Triagem", demanda: "Serviços", vendas: "Vendas", suporte: "Suporte" };
 
 // Mini-formulário da ação "Mover para fila" (especificação "Fila de Demandas
 // de Clientes + Triagem do WhatsApp", 2026-09-03) — cria um registro em
@@ -663,14 +950,104 @@ function MoverParaFilaModal({ fila, telefone, descricaoSugerida, onClose, onUnau
   );
 }
 
-export default function Inbox({ onUnauthorized }) {
-  const [tab, setTab] = useState("suporte");
+export default function Inbox({ onUnauthorized, onNavigate }) {
+  const [tab, setTab] = useState("whatsapp");
+  const [demandas, setDemandas] = useState([]);
+  const [conversasNovas, setConversasNovas] = useState(null);
+  const [erroNovas, setErroNovas] = useState("");
+  const [versao, setVersao] = useState(0); // incrementa pra forçar recarga (métricas incluídas)
+  const [abrirTelefone, setAbrirTelefone] = useState(null);
+  const [modalEncaminhar, setModalEncaminhar] = useState(null); // { telefone, descricaoSugerida } | null
+
+  const recarregar = () => setVersao(v => v + 1);
+
+  useEffect(() => {
+    adminFetch("/api/admin/demandas")
+      .then(d => setDemandas(d.demandas || []))
+      .catch(e => { if (e.unauthorized) return onUnauthorized?.(); });
+    adminFetch("/api/admin/whatsapp/conversas?fila=novas")
+      .then(d => { setConversasNovas(d.conversas || []); setErroNovas(""); })
+      .catch(e => { if (e.unauthorized) return onUnauthorized?.(); setErroNovas(e.message); });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [versao]);
+
+  const verConversa = (telefone) => {
+    setAbrirTelefone(telefone);
+    setTab("whatsapp");
+  };
+
   return (
     <div style={{ padding: "24px 28px" }}>
-      <PageHeader title="Caixa de Entrada" subtitle="Suporte a profissionais e mensageria" />
+      <PageHeader title="Caixa de Entrada" subtitle="Central de triagem — toda conversa nova é roteada pra Vendas, Suporte ou Serviços" />
+      <MetricasTriagem onUnauthorized={onUnauthorized} versao={versao} />
       <Tabs active={tab} onChange={setTab} />
-      {tab === "suporte" && <Suporte onUnauthorized={onUnauthorized} />}
-      {tab === "whatsapp" && <WhatsApp onUnauthorized={onUnauthorized} />}
+
+      {tab === "whatsapp" && <WhatsApp onUnauthorized={onUnauthorized} abrirTelefone={abrirTelefone} />}
+      {tab === "triagem" && (
+        <AbaTriagem
+          demandas={demandas}
+          conversasNovas={conversasNovas}
+          erroNovas={erroNovas}
+          onUnauthorized={onUnauthorized}
+          onVerConversa={verConversa}
+          onMudou={recarregar}
+          onAbrirEncaminharModal={(telefone, descricaoSugerida) => setModalEncaminhar({ telefone, descricaoSugerida })}
+        />
+      )}
+      {tab === "encaminhadas" && (
+        <AbaEncaminhadas demandas={demandas} onUnauthorized={onUnauthorized} onVerConversa={verConversa} onMudou={recarregar} onNavigate={onNavigate} />
+      )}
+      {tab === "acompanhamento" && (
+        <AbaAcompanhamento demandas={demandas} onUnauthorized={onUnauthorized} onVerConversa={verConversa} onMudou={recarregar} onNavigate={onNavigate} />
+      )}
+      {tab === "tickets" && <Tickets onUnauthorized={onUnauthorized} />}
+
+      {modalEncaminhar && (
+        <EscolherFilaEDepoisModal
+          telefone={modalEncaminhar.telefone}
+          descricaoSugerida={modalEncaminhar.descricaoSugerida}
+          onClose={() => setModalEncaminhar(null)}
+          onUnauthorized={onUnauthorized}
+          onConfirmado={recarregar}
+        />
+      )}
+    </div>
+  );
+}
+
+// "Encaminhar direto ▾" numa conversa "Nova" — precisa escolher A fila antes
+// de abrir o MoverParaFilaModal (que já assume a fila decidida). Só isso:
+// um mini-menu de 3 opções que abre o modal de sempre.
+function EscolherFilaEDepoisModal({ telefone, descricaoSugerida, onClose, onUnauthorized, onConfirmado }) {
+  const [filaEscolhida, setFilaEscolhida] = useState(null);
+  if (filaEscolhida) {
+    return (
+      <MoverParaFilaModal
+        fila={filaEscolhida}
+        telefone={telefone}
+        descricaoSugerida={descricaoSugerida}
+        onClose={() => { onClose(); onConfirmado(); }}
+        onUnauthorized={onUnauthorized}
+      />
+    );
+  }
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100 }} onClick={onClose}>
+      <div onClick={e => e.stopPropagation()} style={{ background: "white", borderRadius: 16, padding: 24, width: "100%", maxWidth: 320 }}>
+        <div style={{ fontWeight: 800, fontSize: 15, marginBottom: 14 }}>Encaminhar para...</div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {["vendas", "suporte", "demanda"].map(f => (
+            <button
+              key={f}
+              onClick={() => setFilaEscolhida(f)}
+              style={{ padding: "10px 14px", borderRadius: 8, border: `1px solid ${COLORS.gray200}`, background: "white", fontWeight: 700, fontSize: 13, cursor: "pointer", textAlign: "left" }}
+            >
+              {FILA_LABEL[f]}
+            </button>
+          ))}
+        </div>
+        <button onClick={onClose} style={{ marginTop: 14, background: "none", border: "none", color: COLORS.gray500, fontWeight: 700, fontSize: 12, cursor: "pointer" }}>Cancelar</button>
+      </div>
     </div>
   );
 }
