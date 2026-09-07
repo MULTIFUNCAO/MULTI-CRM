@@ -21,6 +21,33 @@ import { PageHeader, Card, Badge, StatTile, EmptyState, COLORS } from "./ui";
 const TICKET_STATUS_TONE = { aberto: "red", em_andamento: "amber", resolvido: "green" };
 const TICKET_STATUS_LABEL = { aberto: "Aberto", em_andamento: "Em andamento", resolvido: "Resolvido" };
 
+// Achado real (caso Diney, 2026-09-06): "sou de bh atuo como montador de
+// móveis e marido de aluguel" foi triado como demanda de cliente em
+// Atendimentos — é alguém se OFERECENDO como profissional, não pedindo
+// serviço. Heurística simples de texto, só um AVISO visual pra quem está
+// triando — nunca decide nem bloqueia sozinha (mensagem de WhatsApp é
+// texto livre e bagunçado, a heurística pode errar pros dois lados).
+const PADROES_OFERTA_PROFISSIONAL = [
+  /\batuo\s+como\b/i,
+  /\bsou\s+(um\s+|uma\s+)?profissional\s+(de|em)\b/i,
+  /\btrabalho\s+com\b/i,
+  /\bfa[çc]o\s+servi[çc]os?\s+de\b/i,
+  /\bpresto\s+servi[çc]os?\s+de\b/i,
+  /\bsou\s+(montador|eletricista|encanador|pedreiro|pintor|diarista|marceneiro|t[ée]cnico|marido\s+de\s+aluguel)\b/i,
+];
+function pareceOfertaProfissional(texto) {
+  return !!texto && PADROES_OFERTA_PROFISSIONAL.some((p) => p.test(texto));
+}
+
+function AvisoOfertaProfissional() {
+  return (
+    <div style={{ background: COLORS.amberBg, color: COLORS.amber, padding: "8px 12px", borderRadius: 8, fontSize: 12, fontWeight: 700, marginBottom: 10, display: "flex", gap: 6, alignItems: "flex-start" }}>
+      <span>⚠️</span>
+      <span>Isso parece alguém se oferecendo como profissional, não uma demanda de cliente — confirme antes de mover pra Atendimentos/Vendas.</span>
+    </div>
+  );
+}
+
 function Tabs({ active, onChange }) {
   const tabs = [
     { id: "whatsapp", label: "WhatsApp" },
@@ -127,6 +154,7 @@ function DemandaCard({ demanda, acoes, onVerConversa }) {
             {demanda.categoria_servico && ` · ${demanda.categoria_servico}`}
           </div>
           {demanda.descricao && <div style={{ fontSize: 13, color: COLORS.gray700, marginTop: 8 }}>{demanda.descricao}</div>}
+          {pareceOfertaProfissional(demanda.descricao) && <div style={{ marginTop: 8 }}><AvisoOfertaProfissional /></div>}
           <div style={{ fontSize: 11, color: COLORS.gray400, marginTop: 8 }}>
             Aberta {new Date(demanda.criado_em).toLocaleString("pt-BR")}
             {demanda.atualizado_em !== demanda.criado_em && ` · atualizada ${new Date(demanda.atualizado_em).toLocaleString("pt-BR")}`}
@@ -210,6 +238,7 @@ function AbaTriagem({ demandas, conversasNovas, erroNovas, onUnauthorized, onVer
                 <div style={{ fontWeight: 800, fontSize: 14 }}>{c.nomeContato || formatarTelefone(c.telefone)}</div>
                 <div style={{ fontSize: 12, color: COLORS.gray500, marginTop: 2 }}>{formatarTelefone(c.telefone)}</div>
                 <div style={{ fontSize: 13, color: COLORS.gray700, marginTop: 8 }}>{c.ultimaMensagem}</div>
+                {pareceOfertaProfissional(c.ultimaMensagem) && <div style={{ marginTop: 8 }}><AvisoOfertaProfissional /></div>}
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 6, alignItems: "flex-end" }}>
                 <button onClick={() => onVerConversa(c.telefone)} style={{ background: "none", border: `1px solid ${COLORS.gray200}`, borderRadius: 8, padding: "6px 12px", fontWeight: 700, fontSize: 12, color: COLORS.gray700, cursor: "pointer" }}>Ver conversa</button>
@@ -907,6 +936,8 @@ function MoverParaFilaModal({ fila, telefone, descricaoSugerida, onClose, onUnau
           <>
             <div style={{ fontWeight: 800, fontSize: 15, marginBottom: 4 }}>Mover para {FILA_LABEL[fila]}</div>
             <div style={{ fontSize: 12, color: COLORS.gray500, marginBottom: 16 }}>{formatarTelefone(telefone)}</div>
+
+            {pareceOfertaProfissional(descricao) && <AvisoOfertaProfissional />}
 
             <label style={{ fontSize: 12, fontWeight: 700, color: COLORS.gray700, display: "block", marginBottom: 4 }}>Região (cidade/bairro)</label>
             <input
