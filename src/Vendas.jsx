@@ -189,6 +189,7 @@ export default function Vendas({ onUnauthorized }) {
   const [aba, setAba] = useState("funil");
   const [leads, setLeads] = useState(null);
   const [mostrarForm, setMostrarForm] = useState(false);
+  const [mostrarConcluidos, setMostrarConcluidos] = useState(false);
   const [error, setError] = useState("");
 
   const carregar = () => {
@@ -268,26 +269,58 @@ export default function Vendas({ onUnauthorized }) {
           ) : leads.length === 0 ? (
             <Card><EmptyState title="Ninguém no funil ainda" description="Adicione um profissional que a equipe esteja trabalhando ativamente, ou encaminhe uma conversa pra 'Vendas' na Caixa de Entrada — Triagem." /></Card>
           ) : (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))", gap: 14 }}>
-              {ESTAGIOS.map(estagio => {
-                const doEstagio = leads.filter(l => l.estagio === estagio.id);
-                return (
-                  <div key={estagio.id}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-                      <Badge tone={estagio.cor}>{estagio.label}</Badge>
-                      <span style={{ fontSize: 12, color: COLORS.gray400, fontWeight: 700 }}>{doEstagio.length}</span>
+            <>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))", gap: 14 }}>
+                {ESTAGIOS_MANUAIS.map(estagio => {
+                  const doEstagio = leads.filter(l => l.estagio === estagio.id);
+                  return (
+                    <div key={estagio.id}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+                        <Badge tone={estagio.cor}>{estagio.label}</Badge>
+                        <span style={{ fontSize: 12, color: COLORS.gray400, fontWeight: 700 }}>{doEstagio.length}</span>
+                      </div>
+                      {doEstagio.length === 0 ? (
+                        <div style={{ fontSize: 12, color: COLORS.gray400, padding: "12px 0" }}>Vazio</div>
+                      ) : (
+                        doEstagio.map(lead => (
+                          <LeadCard key={lead.id} lead={lead} onMover={mover} onRemover={remover} onUnauthorized={onUnauthorized} onMudou={carregar} />
+                        ))
+                      )}
                     </div>
-                    {doEstagio.length === 0 ? (
-                      <div style={{ fontSize: 12, color: COLORS.gray400, padding: "12px 0" }}>Vazio</div>
-                    ) : (
-                      doEstagio.map(lead => (
-                        <LeadCard key={lead.id} lead={lead} onMover={mover} onRemover={remover} onUnauthorized={onUnauthorized} onMudou={carregar} />
-                      ))
+                  );
+                })}
+              </div>
+
+              {/* Fase 4 do diagnóstico de estrutura do CRM (2026-09-06),
+                  item 1: "pagamento_confirmado" sai do funil ATIVO (não
+                  ocupa mais espaço entre quem a equipe ainda está
+                  trabalhando) mas o histórico não é apagado — fica aqui,
+                  numa seção separada e recolhida por padrão. A transição
+                  pra cá é automática (trigger de banco em
+                  assinaturas.status, ver server.js), nunca um clique. */}
+              {(() => {
+                const concluidos = leads.filter(l => l.estagio === "pagamento_confirmado");
+                if (!concluidos.length) return null;
+                return (
+                  <div style={{ marginTop: 24 }}>
+                    <button
+                      onClick={() => setMostrarConcluidos(v => !v)}
+                      style={{ background: "none", border: "none", padding: 0, cursor: "pointer", display: "flex", alignItems: "center", gap: 8, marginBottom: mostrarConcluidos ? 12 : 0 }}
+                    >
+                      <span style={{ fontSize: 13, fontWeight: 800, color: COLORS.gray700 }}>{mostrarConcluidos ? "▾" : "▸"} Concluídos (saíram do funil — pagamento confirmado)</span>
+                      <span style={{ fontSize: 12, color: COLORS.gray400, fontWeight: 700 }}>{concluidos.length}</span>
+                    </button>
+                    {mostrarConcluidos && (
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))", gap: 14 }}>
+                        {concluidos.map(lead => (
+                          <LeadCard key={lead.id} lead={lead} onMover={mover} onRemover={remover} onUnauthorized={onUnauthorized} onMudou={carregar} />
+                        ))}
+                      </div>
                     )}
                   </div>
                 );
-              })}
-            </div>
+              })()}
+            </>
           )}
         </>
       )}

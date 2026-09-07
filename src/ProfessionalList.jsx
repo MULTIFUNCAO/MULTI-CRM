@@ -42,6 +42,27 @@ export const CICLO_LABEL = {
   em_atraso: { emoji: "🔴", label: "Em atraso", bg: "#FEF2F2", fg: "#DC2626" },
 };
 
+// Fase 4 do diagnóstico de estrutura do CRM (2026-09-06), item 3 — 5 passos
+// de onboarding, calculados no backend (ver calcularOnboardingStep em
+// server.js) só a partir de campos que já existem em usuarios. Sem campo
+// novo — isso aqui é só a exibição.
+export const ONBOARDING_LABEL = {
+  cadastro_incompleto: { emoji: "⚪", label: "Cadastro incompleto", bg: "#F3F4F6", fg: "#6B7280" },
+  documentos_pendentes: { emoji: "📄", label: "Documentos pendentes", bg: "#FFFBEB", fg: "#B45309" },
+  documentos_em_analise: { emoji: "🔍", label: "Documentos em análise", bg: "#EFF6FF", fg: "#1D4ED8" },
+  documentacao_aprovada: { emoji: "✅", label: "Documentação aprovada", bg: "#ECFDF5", fg: "#059669" },
+  perfil_aprovado: { emoji: "🟢", label: "Perfil aprovado", bg: "#ECFDF5", fg: "#059669" },
+};
+
+export function OnboardingBadge({ step }) {
+  const info = ONBOARDING_LABEL[step] || { emoji: "⚪", label: step || "—", bg: "#F3F4F6", fg: "#6B7280" };
+  return (
+    <span style={{ fontSize: 11, fontWeight: 800, padding: "4px 10px", borderRadius: 999, background: info.bg, color: info.fg, whiteSpace: "nowrap" }}>
+      {info.emoji} {info.label}
+    </span>
+  );
+}
+
 function CicloBadge({ ciclo }) {
   if (!ciclo) return <span style={{ color: "#9CA3AF", fontSize: 12 }}>—</span>;
   const info = CICLO_LABEL[ciclo.status] || { emoji: "⚪", label: ciclo.status, bg: "#F3F4F6", fg: "#6B7280" };
@@ -160,7 +181,7 @@ export default function ProfessionalList({ onSelectProfessional, onUnauthorized,
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
               <thead>
                 <tr style={{ background: "#F9FAFB", textAlign: "left" }}>
-                  {["Nome", "Contato", "Categoria(s)", "Cidade", "Cadastro", "Pedidos aceitos", "Status", "Ciclo (Acesso)"].map((h) => (
+                  {["Nome", "Contato", "Categoria(s)", "Cidade", "Cadastro", "Pedidos aceitos", "Status", "Onboarding", "Ciclo (Acesso)"].map((h) => (
                     <th key={h} style={{ padding: "10px 14px", fontWeight: 700, color: "#6B7280", whiteSpace: "nowrap" }}>
                       {h}
                     </th>
@@ -204,6 +225,9 @@ export default function ProfessionalList({ onSelectProfessional, onUnauthorized,
                         </span>
                       </td>
                       <td style={{ padding: "12px 14px" }}>
+                        <OnboardingBadge step={p.onboardingStep} />
+                      </td>
+                      <td style={{ padding: "12px 14px" }}>
                         <CicloBadge ciclo={p.ciclo_financeiro} />
                       </td>
                     </tr>
@@ -211,7 +235,7 @@ export default function ProfessionalList({ onSelectProfessional, onUnauthorized,
                 })}
                 {filtrados.length === 0 && (
                   <tr>
-                    <td colSpan={8} style={{ padding: 24, textAlign: "center", color: "#9CA3AF" }}>
+                    <td colSpan={9} style={{ padding: 24, textAlign: "center", color: "#9CA3AF" }}>
                       Nenhum profissional encontrado.
                     </td>
                   </tr>

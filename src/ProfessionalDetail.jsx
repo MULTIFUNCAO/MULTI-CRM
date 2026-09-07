@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { adminFetch } from "./api";
-import { CICLO_LABEL } from "./ProfessionalList";
+import { CICLO_LABEL, OnboardingBadge } from "./ProfessionalList";
 
 function formatDateTime(iso) {
   if (!iso) return "—";
@@ -95,6 +95,10 @@ export default function ProfessionalDetail({ email, onBack, onUnauthorized }) {
                 <div>
                   <div style={{ color: "#9CA3AF", fontSize: 11, fontWeight: 700, textTransform: "uppercase" }}>Cadastro</div>
                   <div style={{ color: "#111827", fontWeight: 600 }}>{formatDateTime(data.profissional.created_at)}</div>
+                </div>
+                <div>
+                  <div style={{ color: "#9CA3AF", fontSize: 11, fontWeight: 700, textTransform: "uppercase" }}>Onboarding</div>
+                  <OnboardingBadge step={data.profissional.onboardingStep} />
                 </div>
               </div>
             </div>
