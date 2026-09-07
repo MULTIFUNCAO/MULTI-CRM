@@ -16,6 +16,94 @@ function formatMoney(v) {
   return Number(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
+function formatarTelefoneCliente(tel) {
+  const d = String(tel || "").replace(/\D/g, "");
+  const m = d.match(/^55(\d{2})(\d{4,5})(\d{4})$/);
+  if (!m) return d;
+  return `(${m[1]}) ${m[2]}-${m[3]}`;
+}
+
+const STATUS_LABEL_DEMANDA = { aberta: "Aberta", em_andamento: "Em andamento", aguardando_resposta: "Aguardando resposta" };
+
+// View reversa (Profissional → Demandas), 2026-09-07 — espelho do match
+// direto que já existe em Atendimentos.jsx (ProfissionaisSugeridos), só
+// que a partir da ficha do profissional. Reaproveita o mesmo POST /api/
+// admin/demandas/:id/repasses (não duplica lógica de repasse) — aqui o
+// profissional já é fixo (a pessoa cuja ficha está aberta), só a demanda
+// muda por linha. Estilo inline igual ao resto deste arquivo, de
+// propósito (ver nota em ui.jsx — Profissionais não foi migrado pro
+// design system novo ainda).
+function DemandasCompativeis({ email, nome, whatsapp, onUnauthorized }) {
+  const [demandas, setDemandas] = useState(null);
+  const [aviso, setAviso] = useState("");
+  const [erro, setErro] = useState("");
+
+  const carregar = () => {
+    adminFetch(`/api/admin/professionals/${encodeURIComponent(email)}/demandas-compativeis`)
+      .then((d) => { setDemandas(d.demandas || []); setAviso(d.aviso || ""); })
+      .catch((e) => { if (e.unauthorized) return onUnauthorized?.(); setErro(e.message); });
+  };
+
+  useEffect(carregar, [email]);
+
+  const repassar = async (demandaId) => {
+    try {
+      await adminFetch(`/api/admin/demandas/${demandaId}/repasses`, {
+        method: "POST",
+        body: JSON.stringify({ fonte: "usuarios", id: email, nome, whatsapp }),
+      });
+      carregar();
+    } catch (e) {
+      if (e.unauthorized) return onUnauthorized?.();
+      setErro(e.message);
+    }
+  };
+
+  return (
+    <div style={{ background: "white", borderRadius: 16, border: "1px solid #E5E7EB", padding: 20, marginBottom: 16 }}>
+      <h3 style={{ fontSize: 14, fontWeight: 800, margin: "0 0 12px", color: "#111827" }}>Demandas compatíveis</h3>
+      {erro && <div style={{ color: "#DC2626", fontSize: 13, marginBottom: 8 }}>{erro}</div>}
+      {demandas === null && !erro && <div style={{ color: "#9CA3AF", fontSize: 13 }}>Buscando demandas...</div>}
+      {aviso && <div style={{ color: "#9CA3AF", fontSize: 13, fontStyle: "italic" }}>{aviso}</div>}
+      {demandas && demandas.length > 0 && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {demandas.map((d) => (
+            <div
+              key={d.id}
+              style={{ background: "#F9FAFB", borderRadius: 10, padding: "10px 12px", display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10, flexWrap: "wrap" }}
+            >
+              <div>
+                <div style={{ fontWeight: 700, fontSize: 13, color: "#111827" }}>
+                  {d.nome_cliente || formatarTelefoneCliente(d.telefone_cliente) || "Sem nome"}
+                  {d.mesma_regiao && (
+                    <span style={{ marginLeft: 8, fontSize: 10, fontWeight: 800, color: "#059669", textTransform: "uppercase" }}>mesma região</span>
+                  )}
+                </div>
+                <div style={{ fontSize: 11, color: "#9CA3AF", marginTop: 2 }}>
+                  {d.regiao || "região não informada"} · {d.categoria_servico || "categoria não informada"} · {STATUS_LABEL_DEMANDA[d.status] || d.status}
+                </div>
+                {d.descricao && <div style={{ fontSize: 12, color: "#374151", marginTop: 6, maxWidth: 480 }}>{d.descricao}</div>}
+              </div>
+              {d.repasse ? (
+                <span style={{ fontSize: 11, fontWeight: 800, padding: "4px 10px", borderRadius: 999, background: "#ECFDF5", color: "#059669", whiteSpace: "nowrap" }}>
+                  Repassado
+                </span>
+              ) : (
+                <button
+                  onClick={() => repassar(d.id)}
+                  style={{ background: "#0066FF", color: "white", border: "none", borderRadius: 8, padding: "6px 12px", fontWeight: 800, fontSize: 12, cursor: "pointer", whiteSpace: "nowrap" }}
+                >
+                  Repassar
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // Ficha do profissional — Fase 3, mesmo espírito da Ficha do Cliente (Fase
 // 1): só dado real. Sem timeline/score aqui de propósito (não foi pedido
 // pra profissional nessa fase, evita inventar o que não existe).
@@ -102,6 +190,13 @@ export default function ProfessionalDetail({ email, onBack, onUnauthorized }) {
                 </div>
               </div>
             </div>
+
+            <DemandasCompativeis
+              email={data.profissional.email}
+              nome={data.profissional.name}
+              whatsapp={data.profissional.whatsapp}
+              onUnauthorized={onUnauthorized}
+            />
 
             {/* Ciclo financeiro — correção do modelo financeiro, só existe pra
                 quem tem plano "acesso" de verdade */}
